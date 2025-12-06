@@ -9,6 +9,7 @@
 // Features/Stats/Views/EndOfDaySummaryView.swift
 
 import SwiftUI
+import SwiftData
 
 struct EndOfDaySummaryView: View {
     @EnvironmentObject var themeManager: ThemeManager

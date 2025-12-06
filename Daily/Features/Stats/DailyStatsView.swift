@@ -10,6 +10,7 @@
 
 import SwiftUI
 import Charts
+import SwiftData
 
 struct DailyStatsView: View {
     @EnvironmentObject var themeManager: ThemeManager

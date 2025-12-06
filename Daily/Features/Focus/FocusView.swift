@@ -9,6 +9,7 @@
 // Features/Focus/Views/FocusView.swift
 
 import SwiftUI
+import SwiftData
 
 struct FocusView: View {
     @EnvironmentObject var themeManager: ThemeManager
