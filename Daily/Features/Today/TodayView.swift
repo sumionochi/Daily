@@ -3,6 +3,18 @@
 import SwiftUI
 import SwiftData
 
+enum TodayViewMode: String, CaseIterable {
+    case radial = "Radial"
+    case list = "List"
+    
+    var icon: String {
+        switch self {
+        case .radial: return "circle.circle"
+        case .list: return "list.bullet"
+        }
+    }
+}
+
 struct TodayView: View {
     @EnvironmentObject var themeManager: ThemeManager
     @EnvironmentObject var storeContainer: StoreContainer
@@ -11,31 +23,23 @@ struct TodayView: View {
     @State private var timeBlocks: [TimeBlock] = []
     @State private var unscheduledTasks: [Task] = []
     @State private var currentBlock: TimeBlock?
+    @State private var viewMode: TodayViewMode = .radial
     
     var body: some View {
         ZStack {
             AppBackgroundView()
             
             VStack(spacing: 0) {
-                // Date navigation
-                dateNavigationBar
-                    .padding(.horizontal)
-                    .padding(.top)
+                // Date navigation with view mode toggle
+                headerSection
                 
-                // Main content
-                ScrollView {
-                    VStack(spacing: 20) {
-                        // Interactive radial planner
-                        InteractiveRadialView(date: currentDate, size: 320)
-                            .padding(.vertical, 10)
-                        
-                        // Category legend
-                        categoryLegend
-                        
-                        // Quick stats
-                        statsSection
+                // Main content based on mode
+                Group {
+                    if viewMode == .radial {
+                        radialModeContent
+                    } else {
+                        listModeContent
                     }
-                    .padding(.horizontal)
                 }
                 
                 // Task strip at bottom
@@ -54,29 +58,93 @@ struct TodayView: View {
         }
     }
     
-    private var dateNavigationBar: some View {
-        HStack {
-            IconButton(icon: "chevron.left") {
-                changeDate(by: -1)
-            }
-            
-            Spacer()
-            
-            VStack(spacing: 2) {
-                Text(currentDate, format: .dateTime.weekday(.wide))
-                    .font(themeManager.captionFont)
-                    .foregroundColor(themeManager.textSecondaryColor)
+    // MARK: - Header Section
+    
+    private var headerSection: some View {
+        VStack(spacing: 12) {
+            // Date navigation
+            HStack {
+                IconButton(icon: "chevron.left") {
+                    changeDate(by: -1)
+                }
                 
-                Text(currentDate, format: .dateTime.month().day().year())
-                    .font(themeManager.titleFont)
-                    .foregroundColor(themeManager.textPrimaryColor)
+                Spacer()
+                
+                VStack(spacing: 2) {
+                    Text(currentDate, format: .dateTime.weekday(.wide))
+                        .font(themeManager.captionFont)
+                        .foregroundColor(themeManager.textSecondaryColor)
+                    
+                    Text(currentDate, format: .dateTime.month().day().year())
+                        .font(themeManager.titleFont)
+                        .foregroundColor(themeManager.textPrimaryColor)
+                }
+                
+                Spacer()
+                
+                IconButton(icon: "chevron.right") {
+                    changeDate(by: 1)
+                }
             }
             
-            Spacer()
-            
-            IconButton(icon: "chevron.right") {
-                changeDate(by: 1)
+            // View mode toggle
+            HStack {
+                ForEach(TodayViewMode.allCases, id: \.self) { mode in
+                    Button {
+                        withAnimation(.easeInOut(duration: 0.2)) {
+                            viewMode = mode
+                        }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: mode.icon)
+                                .font(.system(size: 14))
+                            Text(mode.rawValue)
+                                .font(themeManager.captionFont)
+                        }
+                        .foregroundColor(viewMode == mode ? .white : themeManager.textPrimaryColor)
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 10)
+                        .background(viewMode == mode ? themeManager.accent : themeManager.cardBackgroundColor)
+                        .clipShape(RoundedRectangle(cornerRadius: 8))
+                    }
+                }
             }
+            .padding(.horizontal, 60)
+        }
+        .padding(.horizontal)
+        .padding(.top)
+    }
+    
+    // MARK: - Radial Mode Content
+    
+    private var radialModeContent: some View {
+        ScrollView {
+            VStack(spacing: 20) {
+                // Interactive radial planner
+                InteractiveRadialView(date: currentDate, size: 320)
+                    .padding(.vertical, 10)
+                
+                // Category legend
+                categoryLegend
+                
+                // Quick stats
+                statsSection
+            }
+            .padding(.horizontal)
+        }
+    }
+    
+    // MARK: - List Mode Content
+    
+    private var listModeContent: some View {
+        VStack(spacing: 0) {
+            // Stats row
+            statsSection
+                .padding(.horizontal)
+                .padding(.top, 12)
+            
+            // List view
+            TodayListView(date: currentDate)
         }
     }
     
@@ -175,10 +243,7 @@ struct TodayView: View {
     }
     
     private func loadUnscheduledTasks() {
-        // Get all unscheduled tasks
         let allUnscheduled = storeContainer.taskStore.fetchUnscheduled()
-        
-        // Filter out tasks that already have blocks today
         let todayBlockTaskIDs = Set(timeBlocks.compactMap { $0.taskID })
         unscheduledTasks = allUnscheduled.filter { !todayBlockTaskIDs.contains($0.id) }
     }
@@ -190,7 +255,6 @@ struct TodayView: View {
     }
     
     private func scheduleTask(_ task: Task) {
-        // Find next available slot
         let preferences = UserPreferences.load()
         let calendar = Calendar.current
         var components = calendar.dateComponents([.year, .month, .day], from: currentDate)
@@ -199,17 +263,14 @@ struct TodayView: View {
         
         guard let startTime = calendar.date(from: components) else { return }
         
-        // Find first free slot
-        var proposedStart = startTime
         let duration = TimeInterval(task.estimatedDuration * 60)
-        let proposedEnd = proposedStart.addingTimeInterval(duration)
+        let proposedEnd = startTime.addingTimeInterval(duration)
         
-        // Create block
         let block = TimeBlock(
             taskID: task.id,
             title: task.title,
             emoji: nil,
-            startDate: proposedStart,
+            startDate: startTime,
             endDate: proposedEnd,
             categoryID: task.categoryID,
             sourceType: .manual
@@ -219,7 +280,6 @@ struct TodayView: View {
             timeBlocks.append(created)
             loadUnscheduledTasks()
             
-            // Haptic feedback
             let impact = UIImpactFeedbackGenerator(style: .medium)
             impact.impactOccurred()
         }
