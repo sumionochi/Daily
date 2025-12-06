@@ -101,7 +101,7 @@ struct RoutinesView: View {
             } label: {
                 Text("Create Your First Routine")
                     .font(themeManager.buttonFont)
-                    .foregroundColor(.white)
+                    .foregroundColor(themeManager.textOnAccentColor)
                     .padding(.horizontal, 24)
                     .padding(.vertical, 12)
                     .background(themeManager.accent)

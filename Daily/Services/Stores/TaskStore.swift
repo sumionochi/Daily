@@ -81,19 +81,24 @@ class TaskStore: ObservableObject {
         let endOfDay = calendar.date(byAdding: .day, value: 1, to: startOfDay)!
         let completedStatus = TaskStatus.completed.rawValue
         
+        // Keep predicate simple: only filter by non-completed in the store
         let descriptor = FetchDescriptor<TaskEntity>(
-            predicate: #Predicate { task in
-                task.dueDate != nil &&
-                task.dueDate! >= startOfDay &&
-                task.dueDate! < endOfDay &&
-                task.statusRaw != completedStatus
-            },
-            sortBy: [SortDescriptor(\.dueDate)]
+            predicate: #Predicate { $0.statusRaw != completedStatus }
         )
         
         do {
             let entities = try modelContext.fetch(descriptor)
-            return entities.map { $0.toDomain() }
+            
+            // Now filter in Swift using optionals safely
+            let filtered = entities.filter { entity in
+                guard let dueDate = entity.dueDate else { return false }
+                return dueDate >= startOfDay && dueDate < endOfDay
+            }
+            .sorted { (lhs, rhs) in
+                (lhs.dueDate ?? .distantFuture) < (rhs.dueDate ?? .distantFuture)
+            }
+            
+            return filtered.map { $0.toDomain() }
         } catch {
             print("Failed to fetch tasks due today: \(error)")
             return []
@@ -104,18 +109,23 @@ class TaskStore: ObservableObject {
         let now = Date()
         let completedStatus = TaskStatus.completed.rawValue
         
+        // Again, simple predicate only on non-completed
         let descriptor = FetchDescriptor<TaskEntity>(
-            predicate: #Predicate { task in
-                task.dueDate != nil &&
-                task.dueDate! < now &&
-                task.statusRaw != completedStatus
-            },
-            sortBy: [SortDescriptor(\.dueDate)]
+            predicate: #Predicate { $0.statusRaw != completedStatus }
         )
         
         do {
             let entities = try modelContext.fetch(descriptor)
-            return entities.map { $0.toDomain() }
+            
+            let filtered = entities.filter { entity in
+                guard let dueDate = entity.dueDate else { return false }
+                return dueDate < now
+            }
+            .sorted { (lhs, rhs) in
+                (lhs.dueDate ?? .distantFuture) < (rhs.dueDate ?? .distantFuture)
+            }
+            
+            return filtered.map { $0.toDomain() }
         } catch {
             print("Failed to fetch overdue tasks: \(error)")
             return []
@@ -124,17 +134,25 @@ class TaskStore: ObservableObject {
     
     func fetchUnscheduled() -> [Task] {
         let pendingStatus = TaskStatus.pending.rawValue
+        
+        // Only filter by status in the store
         let descriptor = FetchDescriptor<TaskEntity>(
-            predicate: #Predicate { task in
-                task.statusRaw == pendingStatus &&
-                (task.timeBlocks == nil || task.timeBlocks!.isEmpty)
-            },
+            predicate: #Predicate { $0.statusRaw == pendingStatus },
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
         )
         
         do {
             let entities = try modelContext.fetch(descriptor)
-            return entities.map { $0.toDomain() }
+            
+            // Then treat tasks with no timeBlocks or empty timeBlocks as unscheduled
+            let filtered = entities.filter { entity in
+                guard let blocks = entity.timeBlocks else {
+                    return true    // no relation at all -> unscheduled
+                }
+                return blocks.isEmpty
+            }
+            
+            return filtered.map { $0.toDomain() }
         } catch {
             print("Failed to fetch unscheduled tasks: \(error)")
             return []
@@ -145,18 +163,23 @@ class TaskStore: ObservableObject {
         let now = Date()
         let pendingStatus = TaskStatus.pending.rawValue
         
+        // Only filter by pending in the store
         let descriptor = FetchDescriptor<TaskEntity>(
-            predicate: #Predicate { task in
-                task.dueDate != nil &&
-                task.dueDate! > now &&
-                task.statusRaw == pendingStatus
-            },
-            sortBy: [SortDescriptor(\.dueDate)]
+            predicate: #Predicate { $0.statusRaw == pendingStatus }
         )
         
         do {
             let entities = try modelContext.fetch(descriptor)
-            return entities.map { $0.toDomain() }
+            
+            let filtered = entities.filter { entity in
+                guard let dueDate = entity.dueDate else { return false }
+                return dueDate > now
+            }
+            .sorted { (lhs, rhs) in
+                (lhs.dueDate ?? .distantFuture) < (rhs.dueDate ?? .distantFuture)
+            }
+            
+            return filtered.map { $0.toDomain() }
         } catch {
             print("Failed to fetch upcoming tasks: \(error)")
             return []

@@ -5,13 +5,13 @@ struct PrimaryButton: View {
     let title: String
     let icon: String?
     let action: () -> Void
-    
+
     init(_ title: String, icon: String? = nil, action: @escaping () -> Void) {
         self.title = title
         self.icon = icon
         self.action = action
     }
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
@@ -21,7 +21,7 @@ struct PrimaryButton: View {
                 Text(title)
             }
             .font(themeManager.buttonFont)
-            .foregroundColor(.white)
+            .foregroundColor(themeManager.textOnAccentColor)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .background(themeManager.accent)
@@ -35,13 +35,14 @@ struct SecondaryButton: View {
     let title: String
     let icon: String?
     let action: () -> Void
-    
-    init(_ title: String, icon: String? = nil, action: @escaping () -> Void) {
+
+    // Same pattern as PrimaryButton
+    init(title: String, icon: String? = nil, action: @escaping () -> Void) {
         self.title = title
         self.icon = icon
         self.action = action
     }
-    
+
     var body: some View {
         Button(action: action) {
             HStack(spacing: 8) {
@@ -88,7 +89,7 @@ struct IconButton: View {
                 print("Primary")
             }
             
-            SecondaryButton("Secondary Action", icon: "arrow.right") {
+            SecondaryButton(title: "Secondary Action", icon: "arrow.right") {
                 print("Secondary")
             }
             

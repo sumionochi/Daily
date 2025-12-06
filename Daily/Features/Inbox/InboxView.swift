@@ -180,7 +180,7 @@ struct InboxView: View {
                 } label: {
                     Text("Add Your First Task")
                         .font(themeManager.buttonFont)
-                        .foregroundColor(.white)
+                        .foregroundColor(themeManager.textOnAccentColor)
                         .padding(.horizontal, 24)
                         .padding(.vertical, 12)
                         .background(themeManager.accent)
@@ -288,7 +288,7 @@ struct FilterChip: View {
                 Text(title)
                     .font(themeManager.captionFont)
             }
-            .foregroundColor(isSelected ? .white : themeManager.textPrimaryColor)
+            .foregroundColor(isSelected ? themeManager.textOnAccentColor : themeManager.textPrimaryColor)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(isSelected ? themeManager.accent : themeManager.cardBackgroundColor)
@@ -320,10 +320,10 @@ struct FolderChip: View {
                 if count > 0 {
                     Text("\(count)")
                         .font(themeManager.captionFont)
-                        .foregroundColor(isSelected ? .white.opacity(0.8) : themeManager.textTertiaryColor)
+                        .foregroundColor(isSelected ? themeManager.textOnAccentColor.opacity(0.8) : themeManager.textTertiaryColor)
                 }
             }
-            .foregroundColor(isSelected ? .white : themeManager.textPrimaryColor)
+            .foregroundColor(isSelected ? themeManager.textOnAccentColor : themeManager.textPrimaryColor)
             .padding(.horizontal, 12)
             .padding(.vertical, 8)
             .background(isSelected ? themeManager.accent : themeManager.cardBackgroundColor)

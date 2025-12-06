@@ -38,24 +38,30 @@ enum ColorSchemePreference: String, CaseIterable, Codable {
 }
 
 enum AccentColor: String, CaseIterable, Codable {
+    case mono
     case blue
     case purple
     case pink
     case orange
     case green
     case teal
-    
+
     var color: Color {
         switch self {
-        case .blue: return Color(red: 0.4, green: 0.6, blue: 1.0)
+        case .mono:
+            // Explicit mono accent: black in light mode, white in dark mode
+            return Color(light: .black, dark: .white)
+
+        case .blue:   return Color(red: 0.4, green: 0.6, blue: 1.0)
         case .purple: return Color(red: 0.7, green: 0.5, blue: 1.0)
-        case .pink: return Color(red: 1.0, green: 0.5, blue: 0.7)
+        case .pink:   return Color(red: 1.0, green: 0.5, blue: 0.7)
         case .orange: return Color(red: 1.0, green: 0.6, blue: 0.4)
-        case .green: return Color(red: 0.5, green: 0.9, blue: 0.6)
-        case .teal: return Color(red: 0.4, green: 0.8, blue: 0.9)
+        case .green:  return Color(red: 0.5, green: 0.9, blue: 0.6)
+        case .teal:   return Color(red: 0.4, green: 0.8, blue: 0.9)
         }
     }
 }
+
 
 // MARK: - ThemeManager
 
@@ -98,7 +104,7 @@ class ThemeManager: ObservableObject {
            let accent = AccentColor(rawValue: savedAccent) {
             self.accentColor = accent
         } else {
-            self.accentColor = .blue
+            self.accentColor = .mono
         }
     }
     
@@ -108,7 +114,9 @@ class ThemeManager: ObservableObject {
     var backgroundColor: Color {
         switch uiStyle {
         case .mono:
-            return Color(uiColor: UIColor.systemBackground)
+            // #f0eef7 in light mode, #000000 in dark mode
+            return Color(light: Color(red: 240/255, green: 238/255, blue: 247/255),
+                        dark: Color(red: 0/255, green: 0/255, blue: 0/255))
         case .liquidGlass:
             return Color.black.opacity(0.85)
         }
@@ -117,7 +125,9 @@ class ThemeManager: ObservableObject {
     var secondaryBackgroundColor: Color {
         switch uiStyle {
         case .mono:
-            return Color(uiColor: UIColor.secondarySystemBackground)
+            // #fefeff in light mode, #1c1c1e in dark mode
+            return Color(light: Color(red: 254/255, green: 254/255, blue: 255/255),
+                        dark: Color(red: 28/255, green: 28/255, blue: 30/255))
         case .liquidGlass:
             return Color.white.opacity(0.05)
         }
@@ -126,7 +136,9 @@ class ThemeManager: ObservableObject {
     var cardBackgroundColor: Color {
         switch uiStyle {
         case .mono:
-            return Color(uiColor: UIColor.secondarySystemBackground)
+            // #fefeff in light mode, #1c1c1e in dark mode
+            return Color(light: Color(red: 254/255, green: 254/255, blue: 255/255),
+                        dark: Color(red: 28/255, green: 28/255, blue: 30/255))
         case .liquidGlass:
             return Color.white.opacity(0.08)
         }
@@ -219,5 +231,42 @@ class ThemeManager: ObservableObject {
         case .mono: return 0
         case .liquidGlass: return 20
         }
+    }
+    
+    // Text color when drawn on top of `accent`
+    var textOnAccentColor: Color {
+        // Special handling for Mono accent (which is dynamic: black in light, white in dark)
+        if accentColor == .mono {
+            switch colorSchemePreference {
+            case .light:
+                // Accent ~ black → use white text
+                return .white
+            case .dark:
+                // Accent ~ white → use black text
+                return .black
+            case .system:
+                // Follow system: white in light, black in dark
+                return Color(light: .white, dark: .black)
+            }
+        } else {
+            // Colored accents → always white text
+            return .white
+        }
+    }
+
+}
+
+// MARK: - Color Extension for Light/Dark Mode
+
+extension Color {
+    init(light: Color, dark: Color) {
+        self.init(UIColor { traitCollection in
+            switch traitCollection.userInterfaceStyle {
+            case .dark:
+                return UIColor(dark)
+            default:
+                return UIColor(light)
+            }
+        })
     }
 }

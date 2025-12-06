@@ -72,18 +72,35 @@ struct SettingsView: View {
                             .font(themeManager.bodyFont)
                             .foregroundColor(themeManager.textPrimaryColor)
                         
-                        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 6), spacing: 12) {
+                        LazyVGrid(columns: Array(repeating: GridItem(.flexible()), count: 7), spacing: 12) {
                             ForEach(AccentColor.allCases, id: \.self) { color in
                                 Button {
                                     themeManager.accentColor = color
                                 } label: {
-                                    Circle()
-                                        .fill(color.color)
-                                        .frame(width: 44, height: 44)
-                                        .overlay(
+                                    ZStack {
+                                        if color == .mono {
+                                            // Special display for mono
                                             Circle()
-                                                .stroke(Color.white, lineWidth: themeManager.accentColor == color ? 3 : 0)
-                                        )
+                                                .fill(
+                                                    LinearGradient(
+                                                        colors: [Color.black, Color.white],
+                                                        startPoint: .topLeading,
+                                                        endPoint: .bottomTrailing
+                                                    )
+                                                )
+                                                .frame(width: 44, height: 44)
+                                        } else {
+                                            Circle()
+                                                .fill(color.color)
+                                                .frame(width: 44, height: 44)
+                                        }
+                                        
+                                        if themeManager.accentColor == color {
+                                            Circle()
+                                                .stroke(themeManager.textPrimaryColor, lineWidth: 3)
+                                                .frame(width: 44, height: 44)
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -125,6 +142,7 @@ struct SettingsView: View {
                                 }
                                 .pickerStyle(.menu)
                                 .frame(width: 60)
+                                .tint(themeManager.accent)
                                 
                                 Text(":")
                                     .foregroundColor(themeManager.textPrimaryColor)
@@ -137,6 +155,7 @@ struct SettingsView: View {
                                 }
                                 .pickerStyle(.menu)
                                 .frame(width: 60)
+                                .tint(themeManager.accent)
                             }
                         }
                     }
@@ -169,6 +188,7 @@ struct SettingsView: View {
                                 }
                                 .pickerStyle(.menu)
                                 .frame(width: 60)
+                                .tint(themeManager.accent)
                                 
                                 Text(":")
                                     .foregroundColor(themeManager.textPrimaryColor)
@@ -181,6 +201,7 @@ struct SettingsView: View {
                                 }
                                 .pickerStyle(.menu)
                                 .frame(width: 60)
+                                .tint(themeManager.accent)
                             }
                         }
                     }

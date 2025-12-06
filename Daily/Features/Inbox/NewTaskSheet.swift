@@ -148,7 +148,7 @@ struct NewTaskSheet: View {
                     .font(themeManager.captionFont)
                     .foregroundColor(
                         selectedCategory == category?.id ?
-                            .white : themeManager.textPrimaryColor
+                        themeManager.textOnAccentColor : themeManager.textPrimaryColor
                     )
             }
             .padding(.horizontal, 12)

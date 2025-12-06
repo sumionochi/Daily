@@ -257,7 +257,7 @@ struct EndOfDaySummaryView: View {
                 }
             }
             
-            SecondaryButton("View Detailed Stats", icon: "chart.bar") {
+            SecondaryButton(title: "View Detailed Stats", icon: "chart.bar") {
                 // TODO: Navigate to detailed stats
                 dismiss()
             }

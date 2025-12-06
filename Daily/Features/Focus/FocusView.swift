@@ -72,7 +72,7 @@ struct FocusView: View {
             } label: {
                 Image(systemName: "xmark")
                     .font(.system(size: 20))
-                    .foregroundColor(.white)
+                    .foregroundColor(themeManager.textOnAccentColor)
                     .frame(width: 44, height: 44)
             }
             
@@ -84,7 +84,7 @@ struct FocusView: View {
                         .font(.system(size: 16))
                     Text(category.name)
                         .font(themeManager.captionFont)
-                        .foregroundColor(.white.opacity(0.7))
+                        .foregroundColor(themeManager.textOnAccentColor.opacity(0.7))
                 }
             }
         }
@@ -105,7 +105,7 @@ struct FocusView: View {
             // Title
             Text(block.title)
                 .font(.system(size: 34, weight: .bold, design: .rounded))
-                .foregroundColor(.white)
+                .foregroundColor(themeManager.textOnAccentColor)
                 .multilineTextAlignment(.center)
                 .padding(.horizontal, 40)
             
@@ -120,7 +120,7 @@ struct FocusView: View {
     private var timerDisplay: some View {
         Text(timeRemainingFormatted)
             .font(.system(size: 72, weight: .light, design: .rounded))
-            .foregroundColor(.white)
+            .foregroundColor(themeManager.textOnAccentColor)
             .monospacedDigit()
     }
     
@@ -158,7 +158,7 @@ struct FocusView: View {
                     Text("Skip")
                         .font(themeManager.captionFont)
                 }
-                .foregroundColor(.white.opacity(0.6))
+                .foregroundColor(themeManager.textOnAccentColor.opacity(0.6))
             }
             
             // Pause/Resume
@@ -171,7 +171,7 @@ struct FocusView: View {
                     Text(isPaused ? "Resume" : "Pause")
                         .font(themeManager.bodyFont)
                 }
-                .foregroundColor(.white)
+                .foregroundColor(themeManager.textOnAccentColor)
             }
             
             // Done

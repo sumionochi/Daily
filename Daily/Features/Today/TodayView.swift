@@ -101,7 +101,7 @@ struct TodayView: View {
                             Text(mode.rawValue)
                                 .font(themeManager.captionFont)
                         }
-                        .foregroundColor(viewMode == mode ? .white : themeManager.textPrimaryColor)
+                        .foregroundColor(viewMode == mode ? themeManager.textOnAccentColor : themeManager.textPrimaryColor)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
                         .background(viewMode == mode ? themeManager.accent : themeManager.cardBackgroundColor)

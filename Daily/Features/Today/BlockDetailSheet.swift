@@ -152,7 +152,7 @@ struct BlockDetailSheet: View {
                     .font(themeManager.captionFont)
                     .foregroundColor(
                         selectedCategory == category?.id ?
-                            .white : themeManager.textPrimaryColor
+                        themeManager.textOnAccentColor : themeManager.textPrimaryColor
                     )
             }
             .padding(.horizontal, 12)
@@ -242,7 +242,7 @@ struct BlockDetailSheet: View {
                 Text("Delete Block")
             }
             .font(themeManager.buttonFont)
-            .foregroundColor(.white)
+            .foregroundColor(themeManager.textOnAccentColor)
             .frame(maxWidth: .infinity)
             .padding(.vertical, 16)
             .background(Color.red)

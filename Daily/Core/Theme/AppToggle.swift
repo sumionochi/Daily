@@ -46,7 +46,9 @@ struct AppToggle: View {
     }
 }
 
-struct AppSegmentedControl<T: Hashable & CaseIterable & RawRepresentable>: View where T.RawValue == String, T.AllCases: RandomAccessCollection {
+struct AppSegmentedControl<T: Hashable & CaseIterable & RawRepresentable>: View
+where T.RawValue == String, T.AllCases: RandomAccessCollection {
+    
     @EnvironmentObject var themeManager: ThemeManager
     @Binding var selection: T
     let displayNameProvider: (T) -> String
@@ -69,39 +71,33 @@ struct AppSegmentedControl<T: Hashable & CaseIterable & RawRepresentable>: View 
                 } label: {
                     Text(displayNameProvider(option))
                         .font(themeManager.captionFont)
-                        .foregroundColor(selection == option ? .white : themeManager.textPrimaryColor)
+                        .foregroundColor(
+                            selection == option
+                            ? themeManager.textOnAccentColor      // ✅ dynamic text color
+                            : themeManager.textPrimaryColor        // unselected
+                        )
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 10)
                         .background(
-                            selection == option ? themeManager.accent : Color.clear
+                            selection == option
+                            ? themeManager.accent                  // pill color
+                            : Color.clear
                         )
-                        .clipShape(RoundedRectangle(cornerRadius: themeManager.cornerRadiusSmall))
+                        .clipShape(
+                            RoundedRectangle(
+                                cornerRadius: themeManager.cornerRadiusSmall
+                            )
+                        )
                 }
             }
         }
         .padding(4)
         .background(themeManager.cardBackgroundColor)
-        .clipShape(RoundedRectangle(cornerRadius: themeManager.cornerRadiusMedium))
+        .clipShape(
+            RoundedRectangle(
+                cornerRadius: themeManager.cornerRadiusMedium
+            )
+        )
     }
 }
 
-#Preview {
-    ZStack {
-        AppBackgroundView()
-        
-        VStack(spacing: 16) {
-            AppToggle(
-                "Enable Feature",
-                subtitle: "This is a helpful description",
-                isOn: .constant(true)
-            )
-            
-            AppSegmentedControl(
-                selection: .constant(UIStyle.mono),
-                displayNameProvider: { $0.displayName }
-            )
-        }
-        .padding()
-    }
-    .environmentObject(ThemeManager())
-}
