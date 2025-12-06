@@ -141,6 +141,43 @@ class TaskStore: ObservableObject {
         }
     }
     
+    func fetchUpcoming() -> [Task] {
+        let now = Date()
+        let pendingStatus = TaskStatus.pending.rawValue
+        
+        let descriptor = FetchDescriptor<TaskEntity>(
+            predicate: #Predicate { task in
+                task.dueDate != nil &&
+                task.dueDate! > now &&
+                task.statusRaw == pendingStatus
+            },
+            sortBy: [SortDescriptor(\.dueDate)]
+        )
+        
+        do {
+            let entities = try modelContext.fetch(descriptor)
+            return entities.map { $0.toDomain() }
+        } catch {
+            print("Failed to fetch upcoming tasks: \(error)")
+            return []
+        }
+    }
+    
+    func fetchByFolder(_ folder: String) -> [Task] {
+        let descriptor = FetchDescriptor<TaskEntity>(
+            predicate: #Predicate { $0.folder == folder },
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        
+        do {
+            let entities = try modelContext.fetch(descriptor)
+            return entities.map { $0.toDomain() }
+        } catch {
+            print("Failed to fetch tasks by folder: \(error)")
+            return []
+        }
+    }
+    
     func search(_ query: String) -> [Task] {
         guard !query.isEmpty else { return fetchAll() }
         

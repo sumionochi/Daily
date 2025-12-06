@@ -15,6 +15,7 @@ struct Task: Identifiable, Codable, Equatable {
     var sourceType: SourceType
     var externalID: String? // For synced tasks (Notion ID, Reminder ID, etc.)
     var tags: [String]
+    var folder: String? // Inbox, Work, Personal, Someday
     var createdAt: Date
     var updatedAt: Date
     
@@ -31,6 +32,7 @@ struct Task: Identifiable, Codable, Equatable {
         sourceType: SourceType = .manual,
         externalID: String? = nil,
         tags: [String] = [],
+        folder: String? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -46,6 +48,7 @@ struct Task: Identifiable, Codable, Equatable {
         self.sourceType = sourceType
         self.externalID = externalID
         self.tags = tags
+        self.folder = folder
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }

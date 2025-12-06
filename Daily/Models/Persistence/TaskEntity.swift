@@ -1,11 +1,3 @@
-//
-//  TaskEntity.swift
-//  Daily
-//
-//  Created by Aaditya Srivastava on 06/12/25.
-//
-
-
 // Models/Persistence/TaskEntity.swift
 
 import Foundation
@@ -24,6 +16,7 @@ final class TaskEntity {
     var sourceTypeRaw: String
     var externalID: String?
     var tagsData: Data? // JSON encoded [String]
+    var folder: String?
     var createdAt: Date
     var updatedAt: Date
     
@@ -45,6 +38,7 @@ final class TaskEntity {
         sourceTypeRaw: String = SourceType.manual.rawValue,
         externalID: String? = nil,
         tagsData: Data? = nil,
+        folder: String? = nil,
         createdAt: Date = Date(),
         updatedAt: Date = Date()
     ) {
@@ -59,6 +53,7 @@ final class TaskEntity {
         self.sourceTypeRaw = sourceTypeRaw
         self.externalID = externalID
         self.tagsData = tagsData
+        self.folder = folder
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }
@@ -104,6 +99,7 @@ final class TaskEntity {
             sourceType: sourceType,
             externalID: externalID,
             tags: tags,
+            folder: folder,
             createdAt: createdAt,
             updatedAt: updatedAt
         )
@@ -121,6 +117,7 @@ final class TaskEntity {
         self.sourceType = task.sourceType
         self.externalID = task.externalID
         self.tags = task.tags
+        self.folder = task.folder
         self.updatedAt = Date()
     }
     
@@ -137,6 +134,7 @@ final class TaskEntity {
             completedAt: task.completedAt,
             sourceTypeRaw: task.sourceType.rawValue,
             externalID: task.externalID,
+            folder: task.folder,
             createdAt: task.createdAt,
             updatedAt: task.updatedAt
         )
