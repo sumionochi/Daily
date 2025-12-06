@@ -2,10 +2,10 @@
 
 import Foundation
 import SwiftData
-import SwiftUI      // ⬅️ ADD THIS so ObservableObject exists
+import SwiftUI
 import Combine
 
-@MainActor          // ⬅️ Recommended, since ModelContext is main-actor bound
+@MainActor
 final class StoreContainer: ObservableObject {
     
     let modelContext: ModelContext
@@ -14,6 +14,7 @@ final class StoreContainer: ObservableObject {
     let planStore: PlanStore
     let routineStore: RoutineStore
     let seedDataService: SeedDataService
+    let routineEngine: RoutineEngine
     
     init(modelContext: ModelContext, shouldSeed: Bool = true) {
         self.modelContext = modelContext
@@ -23,6 +24,7 @@ final class StoreContainer: ObservableObject {
         self.taskStore = TaskStore(modelContext: modelContext, categoryStore: categoryStore)
         self.planStore = PlanStore(modelContext: modelContext, taskStore: taskStore, categoryStore: categoryStore)
         self.routineStore = RoutineStore(modelContext: modelContext, categoryStore: categoryStore)
+        self.routineEngine = RoutineEngine(routineStore: routineStore, planStore: planStore)
         self.seedDataService = SeedDataService(
             categoryStore: categoryStore,
             taskStore: taskStore,
@@ -31,6 +33,7 @@ final class StoreContainer: ObservableObject {
         
         if shouldSeed {
             seedDataService.seedIfNeeded()
+            routineEngine.generateBlocksForNextDays(30)
         }
     }
 }
