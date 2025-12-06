@@ -1,3 +1,11 @@
+//
+//  UserPreferences.swift
+//  Daily
+//
+//  Created by Aaditya Srivastava on 06/12/25.
+//
+
+
 // Models/Domain/UserPreferences.swift
 
 import Foundation

@@ -9,28 +9,41 @@ struct TodayView: View {
     
     @State private var currentDate = Date()
     @State private var timeBlocks: [TimeBlock] = []
+    @State private var unscheduledTasks: [Task] = []
     @State private var currentBlock: TimeBlock?
     
     var body: some View {
         ZStack {
             AppBackgroundView()
             
-            ScrollView {
-                VStack(spacing: 20) {
-                    // Date navigation
-                    dateNavigationBar
-                    
-                    // Radial planner
-                    RadialDayView(date: currentDate, size: 320)
-                        .padding(.vertical, 10)
-                    
-                    // Category legend
-                    categoryLegend
-                    
-                    // Quick stats
-                    statsSection
+            VStack(spacing: 0) {
+                // Date navigation
+                dateNavigationBar
+                    .padding(.horizontal)
+                    .padding(.top)
+                
+                // Main content
+                ScrollView {
+                    VStack(spacing: 20) {
+                        // Interactive radial planner
+                        InteractiveRadialView(date: currentDate, size: 320)
+                            .padding(.vertical, 10)
+                        
+                        // Category legend
+                        categoryLegend
+                        
+                        // Quick stats
+                        statsSection
+                    }
+                    .padding(.horizontal)
                 }
-                .padding()
+                
+                // Task strip at bottom
+                if !unscheduledTasks.isEmpty {
+                    TaskStripView(tasks: unscheduledTasks) { task in
+                        scheduleTask(task)
+                    }
+                }
             }
         }
         .onAppear {
@@ -158,11 +171,57 @@ struct TodayView: View {
     private func loadData() {
         timeBlocks = storeContainer.planStore.fetchBlocksFor(date: currentDate)
         currentBlock = storeContainer.planStore.fetchCurrentBlock()
+        loadUnscheduledTasks()
+    }
+    
+    private func loadUnscheduledTasks() {
+        // Get all unscheduled tasks
+        let allUnscheduled = storeContainer.taskStore.fetchUnscheduled()
+        
+        // Filter out tasks that already have blocks today
+        let todayBlockTaskIDs = Set(timeBlocks.compactMap { $0.taskID })
+        unscheduledTasks = allUnscheduled.filter { !todayBlockTaskIDs.contains($0.id) }
     }
     
     private func changeDate(by days: Int) {
         if let newDate = Calendar.current.date(byAdding: .day, value: days, to: currentDate) {
             currentDate = newDate
+        }
+    }
+    
+    private func scheduleTask(_ task: Task) {
+        // Find next available slot
+        let preferences = UserPreferences.load()
+        let calendar = Calendar.current
+        var components = calendar.dateComponents([.year, .month, .day], from: currentDate)
+        components.hour = preferences.wakeHour
+        components.minute = preferences.wakeMinute
+        
+        guard let startTime = calendar.date(from: components) else { return }
+        
+        // Find first free slot
+        var proposedStart = startTime
+        let duration = TimeInterval(task.estimatedDuration * 60)
+        let proposedEnd = proposedStart.addingTimeInterval(duration)
+        
+        // Create block
+        let block = TimeBlock(
+            taskID: task.id,
+            title: task.title,
+            emoji: nil,
+            startDate: proposedStart,
+            endDate: proposedEnd,
+            categoryID: task.categoryID,
+            sourceType: .manual
+        )
+        
+        if let created = storeContainer.planStore.createBlock(block) {
+            timeBlocks.append(created)
+            loadUnscheduledTasks()
+            
+            // Haptic feedback
+            let impact = UIImpactFeedbackGenerator(style: .medium)
+            impact.impactOccurred()
         }
     }
 }
