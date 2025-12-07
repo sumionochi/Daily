@@ -1,11 +1,3 @@
-//
-//  RadialLayoutEngine.swift
-//  Daily
-//
-//  Created by Aaditya Srivastava on 06/12/25.
-//
-
-
 // Features/Radial/RadialLayoutEngine.swift
 
 import Foundation

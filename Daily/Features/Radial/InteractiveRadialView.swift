@@ -1,11 +1,3 @@
-//
-//  InteractiveRadialView.swift
-//  Daily
-//
-//  Created by Aaditya Srivastava on 06/12/25.
-//
-
-
 // Features/Radial/InteractiveRadialView.swift
 
 import SwiftUI
@@ -22,68 +14,68 @@ struct InteractiveRadialView: View {
     @State private var categories: [UUID: Category] = [:]
     @State private var currentTime = Date()
     @State private var draggedBlock: TimeBlock?
-    @State private var dragOffset: CGSize = .zero
     @State private var selectedBlock: TimeBlock?
     @State private var showBlockDetail = false
     @State private var conflicts: Set<UUID> = []
     
-    // Radial dimensions
-    private let innerRadius: CGFloat
+    // Radial dimensions - refined
     private let outerRadius: CGFloat
-    private let ringThickness: CGFloat = 50
+    private let innerRadius: CGFloat
+    private let arcThickness: CGFloat = 32
     
-    init(date: Date, size: CGFloat = 320) {
+    init(date: Date, size: CGFloat = 360) {
         self.date = date
         self.size = size
         self.outerRadius = size / 2 - 20
-        self.innerRadius = outerRadius - ringThickness
+        self.innerRadius = outerRadius - 60 // Space for ticks
     }
     
     var body: some View {
         ZStack {
-            // Clock face
+            // Clock face with ticks
             RadialClockFace(radius: outerRadius)
             
-            // Time blocks
+            // Time blocks as thin arcs
             ForEach(timeBlocks) { block in
                 if block.id != draggedBlock?.id {
-                    blockView(for: block)
-                        .onTapGesture {
-                            selectedBlock = block
-                            showBlockDetail = true
-                        }
-                        .gesture(
-                            DragGesture()
-                                .onChanged { _ in
-                                    draggedBlock = block
-                                }
-                        )
+                    RadialBlockView(
+                        block: block,
+                        innerRadius: innerRadius,
+                        outerRadius: outerRadius,
+                        category: block.categoryID != nil ? categories[block.categoryID!] : nil
+                    )
+                    .onTapGesture {
+                        selectedBlock = block
+                        showBlockDetail = true
+                    }
+                    .gesture(
+                        DragGesture()
+                            .onChanged { _ in
+                                draggedBlock = block
+                            }
+                    )
                 }
             }
             
             // Dragged block overlay
             if let dragged = draggedBlock {
-                blockView(for: dragged)
-                    .opacity(0.8)
-                    .scaleEffect(1.05)
+                RadialBlockView(
+                    block: dragged,
+                    innerRadius: innerRadius,
+                    outerRadius: outerRadius,
+                    category: dragged.categoryID != nil ? categories[dragged.categoryID!] : nil
+                )
+                .opacity(0.8)
+                .scaleEffect(1.02)
             }
             
             // Current time indicator
             if Calendar.current.isDateInToday(date) {
-                RadialCurrentTimeIndicator(
-                    currentTime: currentTime,
-                    innerRadius: innerRadius,
-                    outerRadius: outerRadius
-                )
+                currentTimeIndicator
             }
             
             // Center info
             centerInfo
-            
-            // Over-scheduled warning
-            if isOverScheduled {
-                overScheduledWarning
-            }
         }
         .frame(width: size, height: size)
         .gesture(
@@ -117,63 +109,124 @@ struct InteractiveRadialView: View {
         }
     }
     
-    // MARK: - Block View
+    // MARK: - Current Time Indicator
     
-    private func blockView(for block: TimeBlock) -> some View {
-        let hasConflict = conflicts.contains(block.id)
+    private var currentTimeIndicator: some View {
+        let calendar = Calendar.current
+        let hour = calendar.component(.hour, from: currentTime)
+        let minute = calendar.component(.minute, from: currentTime)
+        let angle = RadialLayoutEngine.angle(fromHour: hour, minute: minute)
+        let angleRadians = (angle - 90) * .pi / 180
         
-        return RadialBlockView(
-            block: block,
-            innerRadius: innerRadius,
-            outerRadius: outerRadius,
-            category: block.categoryID != nil ? categories[block.categoryID!] : nil
-        )
-        .overlay(
-            hasConflict ?
-                ArcShape(
-                    startAngle: RadialLayoutEngine.swiftUIAngle(block.startAngle),
-                    endAngle: RadialLayoutEngine.swiftUIAngle(block.endAngle),
-                    innerRadius: innerRadius,
-                    outerRadius: outerRadius
+        let startRadius: CGFloat = innerRadius - 10
+        let endRadius: CGFloat = outerRadius + 10
+        
+        return ZStack {
+            // Line
+            Path { path in
+                let startX = startRadius * cos(angleRadians)
+                let startY = startRadius * sin(angleRadians)
+                let endX = endRadius * cos(angleRadians)
+                let endY = endRadius * sin(angleRadians)
+                
+                path.move(to: CGPoint(x: startX, y: startY))
+                path.addLine(to: CGPoint(x: endX, y: endY))
+            }
+            .stroke(themeManager.accent, lineWidth: 2)
+            
+            // Dot at end
+            Circle()
+                .fill(themeManager.accent)
+                .frame(width: 8, height: 8)
+                .offset(
+                    x: endRadius * cos(angleRadians),
+                    y: endRadius * sin(angleRadians)
                 )
-                .stroke(Color.red, lineWidth: 3)
-                .shadow(color: .red.opacity(0.5), radius: 8)
-            : nil
-        )
+        }
     }
     
+    // MARK: - Center Info
+    
     private var centerInfo: some View {
-        VStack(spacing: 4) {
+        VStack(spacing: 8) {
             Text(date, format: .dateTime.weekday(.abbreviated))
-                .font(themeManager.captionFont)
-                .foregroundColor(themeManager.textSecondaryColor)
+                        .font(.system(size: 14, weight: .semibold, design: .rounded))
+                        .foregroundColor(themeManager.textSecondaryColor)
+                        .textCase(.uppercase)
             
-            Text(date, format: .dateTime.day())
-                .font(.system(size: 36, weight: .bold, design: .rounded))
-                .foregroundColor(themeManager.textPrimaryColor)
+            Text("\(totalScheduledHours)h \(totalScheduledMinutes % 60)m scheduled")
+                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .foregroundColor(themeManager.textTertiaryColor)
             
-            Text(date, format: .dateTime.month(.abbreviated))
-                .font(themeManager.captionFont)
-                .foregroundColor(themeManager.textSecondaryColor)
+            // Category summary
+            VStack(spacing: 4) {
+                ForEach(categorySummary.prefix(4), id: \.0.id) { category, minutes in
+                    HStack(spacing: 8) {
+                        Text(category.name.uppercased())
+                            .font(.system(size: 11, weight: .bold, design: .rounded))
+                            .foregroundColor(categoryColorFor(category))
+
+                        Text(formatMinutes(minutes))
+                            .font(.system(size: 11, weight: .medium, design: .rounded))
+                            .foregroundColor(themeManager.textSecondaryColor)
+                    }
+                }
+            }
+            .padding(.top, 4)
         }
         .allowsHitTesting(false)
     }
     
-    private var overScheduledWarning: some View {
-        VStack {
-            Spacer()
-            HStack {
-                Image(systemName: "exclamationmark.triangle.fill")
-                Text("Circle Full")
-                    .font(themeManager.captionFont)
+    // MARK: - Category Summary
+    
+    private var categorySummary: [(Category, Int)] {
+        var categoryMinutes: [UUID: Int] = [:]
+        
+        for block in timeBlocks {
+            if let catID = block.categoryID {
+                categoryMinutes[catID, default: 0] += block.durationMinutes
             }
-            .foregroundColor(.red)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(Color.red.opacity(0.2))
-            .clipShape(RoundedRectangle(cornerRadius: 8))
-            .padding(.bottom, 8)
         }
+        
+        return categoryMinutes.compactMap { catID, minutes in
+            guard let category = categories[catID] else { return nil }
+            return (category, minutes)
+        }
+        .sorted { $0.1 > $1.1 }
+    }
+    
+    private func categoryColorFor(_ category: Category) -> Color {
+        switch category.colorID {
+        case "blue": return Color(red: 0.4, green: 0.6, blue: 1.0)
+        case "purple": return Color(red: 0.7, green: 0.5, blue: 1.0)
+        case "pink": return Color(red: 1.0, green: 0.5, blue: 0.7)
+        case "orange": return Color(red: 1.0, green: 0.6, blue: 0.4)
+        case "green": return Color(red: 0.5, green: 0.9, blue: 0.6)
+        case "teal": return Color(red: 0.4, green: 0.8, blue: 0.9)
+        default: return themeManager.accent
+        }
+    }
+    
+    private func formatMinutes(_ minutes: Int) -> String {
+        let hours = minutes / 60
+        let mins = minutes % 60
+        if hours > 0 && mins > 0 {
+            return "\(hours)h\(mins)m"
+        } else if hours > 0 {
+            return "\(hours)h"
+        } else {
+            return "\(mins)m"
+        }
+    }
+    
+    // MARK: - Computed Properties
+    
+    private var totalScheduledMinutes: Int {
+        timeBlocks.reduce(0) { $0 + $1.durationMinutes }
+    }
+    
+    private var totalScheduledHours: Int {
+        totalScheduledMinutes / 60
     }
     
     // MARK: - Drag Handling
@@ -181,21 +234,18 @@ struct InteractiveRadialView: View {
     private func handleDrag(_ value: DragGesture.Value) {
         guard var dragged = draggedBlock else { return }
         
-        // Calculate angle from drag location
         let center = CGPoint(x: size / 2, y: size / 2)
         let location = value.location
         let dx = location.x - center.x
         let dy = location.y - center.y
         
         var angle = atan2(dy, dx) * 180 / .pi
-        angle = angle + 90 // Adjust for our coordinate system
+        angle = angle + 90
         if angle < 0 { angle += 360 }
         
-        // Snap to interval
         let preferences = UserPreferences.load()
         let snappedAngle = RadialLayoutEngine.snapAngle(angle, toMinutes: preferences.snapInterval)
         
-        // Calculate new times
         let (hour, minute) = RadialLayoutEngine.timeComponents(from: snappedAngle)
         let calendar = Calendar.current
         var components = calendar.dateComponents([.year, .month, .day], from: date)
@@ -217,7 +267,6 @@ struct InteractiveRadialView: View {
     private func completeDrag() {
         guard let dragged = draggedBlock else { return }
         
-        // Update block in store
         if let updated = storeContainer.planStore.updateBlock(dragged) {
             if let index = timeBlocks.firstIndex(where: { $0.id == updated.id }) {
                 timeBlocks[index] = updated
@@ -227,7 +276,6 @@ struct InteractiveRadialView: View {
         draggedBlock = nil
         detectConflicts()
         
-        // Haptic feedback
         let impact = UIImpactFeedbackGenerator(style: .medium)
         impact.impactOccurred()
     }
@@ -250,11 +298,6 @@ struct InteractiveRadialView: View {
         }
         
         conflicts = newConflicts
-    }
-    
-    private var isOverScheduled: Bool {
-        let totalMinutes = timeBlocks.reduce(0) { $0 + $1.durationMinutes }
-        return totalMinutes > 24 * 60
     }
     
     // MARK: - Data Loading
@@ -295,9 +338,10 @@ struct InteractiveRadialView: View {
 
 #Preview {
     ZStack {
-        AppBackgroundView()
+        Color.black
+            .ignoresSafeArea()
         
-        InteractiveRadialView(date: Date(), size: 320)
+        InteractiveRadialView(date: Date(), size: 360)
     }
     .environmentObject(ThemeManager())
     .environmentObject({

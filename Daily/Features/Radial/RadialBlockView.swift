@@ -10,53 +10,79 @@ struct RadialBlockView: View {
     let outerRadius: CGFloat
     let category: Category?
     
+    private let arcThickness: CGFloat = 32 // Thinner arcs
+    
     var body: some View {
         ZStack {
-            // Arc shape
-            ArcShape(
-                startAngle: RadialLayoutEngine.swiftUIAngle(block.startAngle),
-                endAngle: RadialLayoutEngine.swiftUIAngle(block.endAngle),
-                innerRadius: innerRadius,
-                outerRadius: outerRadius
-            )
-            .fill(blockColor.opacity(block.isDone ? 0.4 : 0.8))
+            // The arc
+            arcShape
+                .fill(categoryColor.opacity(block.isDone ? 0.4 : 1.0))
             
-            // Border
-            ArcShape(
-                startAngle: RadialLayoutEngine.swiftUIAngle(block.startAngle),
-                endAngle: RadialLayoutEngine.swiftUIAngle(block.endAngle),
-                innerRadius: innerRadius,
-                outerRadius: outerRadius
-            )
-            .stroke(blockColor, lineWidth: 2)
-            
-            // Emoji/Icon (if duration is long enough)
-            if block.sweepAngle > 20, let emoji = block.emoji {
-                let midAngle = block.startAngle + (block.sweepAngle / 2)
-                let midRadius = (innerRadius + outerRadius) / 2
-                
-                Text(emoji)
-                    .font(.system(size: 20))
-                    .position(
-                        RadialLayoutEngine.point(
-                            at: midAngle,
-                            radius: midRadius,
-                            center: CGPoint(x: outerRadius, y: outerRadius)
-                        )
-                    )
+            // Block label (outside the arc)
+            if sweepAngle > 10 {
+                blockLabel
             }
         }
     }
     
-    private var blockColor: Color {
-        if let category = category {
-            return categoryColor(for: category.colorID)
-        }
-        return themeManager.accent
+    // MARK: - Arc Shape
+    
+    private var arcShape: ArcShape {
+        ArcShape(
+            startAngle: RadialLayoutEngine.swiftUIAngle(block.startAngle),
+            endAngle: RadialLayoutEngine.swiftUIAngle(block.endAngle),
+            innerRadius: innerRadius,
+            outerRadius: innerRadius + arcThickness
+        )
     }
     
-    private func categoryColor(for colorID: String) -> Color {
-        switch colorID {
+    // MARK: - Block Label
+    
+    private var blockLabel: some View {
+        let midAngle = (block.startAngle + block.endAngle) / 2
+        let angleRadians = (midAngle - 90) * .pi / 180 // Adjust for top-start
+        
+        // Position label outside the arc
+        let labelRadius = outerRadius + 40
+        let x = labelRadius * cos(angleRadians)
+        let y = labelRadius * sin(angleRadians)
+        
+        // Calculate rotation to make text readable
+        var textRotation = midAngle
+        if midAngle > 90 && midAngle < 270 {
+            textRotation += 180 // Flip text on left side
+        }
+        
+        return VStack(spacing: 2) {
+            if let emoji = block.emoji {
+                Text(emoji)
+                    .font(.system(size: 24))
+            }
+            
+            Text(block.title)
+                .font(.system(size: 12, weight: .semibold, design: .rounded))
+                .foregroundColor(themeManager.textPrimaryColor)
+                .lineLimit(2)
+                .multilineTextAlignment(.center)
+                .frame(width: 80)
+        }
+        .rotationEffect(.degrees(textRotation))
+        .offset(x: x, y: y)
+    }
+    
+    // MARK: - Computed Properties
+    
+    private var sweepAngle: Double {
+        let sweep = block.endAngle - block.startAngle
+        return sweep >= 0 ? sweep : sweep + 360
+    }
+    
+    private var categoryColor: Color {
+        guard let category = category else {
+            return themeManager.accent
+        }
+        
+        switch category.colorID {
         case "blue": return Color(red: 0.4, green: 0.6, blue: 1.0)
         case "purple": return Color(red: 0.7, green: 0.5, blue: 1.0)
         case "pink": return Color(red: 1.0, green: 0.5, blue: 0.7)
@@ -114,22 +140,21 @@ struct ArcShape: Shape {
     let block = TimeBlock(
         title: "Deep Work",
         emoji: "🎯",
-        startDate: Calendar.current.date(from: DateComponents(hour: 9, minute: 0))!,
-        endDate: Calendar.current.date(from: DateComponents(hour: 11, minute: 0))!
+        startDate: Date(),
+        endDate: Date().addingTimeInterval(7200) // 2 hours
     )
-    
-    let category = Category(name: "Focus", emoji: "🎯", colorID: "blue")
     
     return ZStack {
         Color.black
+            .ignoresSafeArea()
         
         RadialBlockView(
             block: block,
-            innerRadius: 80,
-            outerRadius: 120,
-            category: category
+            innerRadius: 120,
+            outerRadius: 160,
+            category: nil
         )
-        .frame(width: 240, height: 240)
+        .frame(width: 320, height: 320)
     }
     .environmentObject(ThemeManager())
 }

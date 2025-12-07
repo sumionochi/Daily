@@ -1,4 +1,4 @@
-// Features/Today/Views/TodayView.swift
+// Features/Today/Views/TodayView_Clean.swift
 
 import SwiftUI
 import SwiftData
@@ -22,8 +22,9 @@ struct TodayView: View {
     @State private var currentDate = Date()
     @State private var timeBlocks: [TimeBlock] = []
     @State private var unscheduledTasks: [Task] = []
-    @State private var currentBlock: TimeBlock?
     @State private var viewMode: TodayViewMode = .radial
+    @State private var showStats = false
+    @State private var showNewBlock = false
     
     var body: some View {
         ZStack {
@@ -42,12 +43,25 @@ struct TodayView: View {
                     }
                 }
                 
-                // Task strip at bottom
+                // Bottom action buttons
+                bottomActionButtons
+                    .padding(.horizontal)
+                    .padding(.bottom, 16)
+                
+                // Task strip (if unscheduled tasks exist)
                 if !unscheduledTasks.isEmpty {
                     TaskStripView(tasks: unscheduledTasks) { task in
                         scheduleTask(task)
                     }
                 }
+            }
+        }
+        .sheet(isPresented: $showStats) {
+            DayStatsPopup(date: currentDate)
+        }
+        .sheet(isPresented: $showNewBlock) {
+            QuickTaskSheet(date: currentDate) { block in
+                createBlock(block)
             }
         }
         .onAppear {
@@ -120,125 +134,66 @@ struct TodayView: View {
     private var radialModeContent: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Interactive radial planner
-                InteractiveRadialView(date: currentDate, size: 320)
-                    .padding(.vertical, 10)
-                
-                // Category legend
-                categoryLegend
-                
-                // Quick stats
-                statsSection
+                // Interactive radial planner (clean, no stats)
+                InteractiveRadialView(date: currentDate, size: 360)
+                    .padding(.vertical, 20)
             }
-            .padding(.horizontal)
         }
     }
     
     // MARK: - List Mode Content
     
     private var listModeContent: some View {
-        VStack(spacing: 0) {
-            // Stats row
-            statsSection
-                .padding(.horizontal)
-                .padding(.top, 12)
-            
-            // List view
-            TodayListView(date: currentDate)
-        }
+        TodayListView(date: currentDate)
     }
     
-    private var categoryLegend: some View {
-        let categories = storeContainer.categoryStore.fetchAll()
-        
-        return AppCard(padding: 12) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text("Categories")
-                    .font(themeManager.captionFont)
-                    .foregroundColor(themeManager.textSecondaryColor)
-                
-                LazyVGrid(columns: [
-                    GridItem(.flexible()),
-                    GridItem(.flexible())
-                ], spacing: 8) {
-                    ForEach(categories.prefix(6)) { category in
-                        HStack(spacing: 6) {
-                            Text(category.emoji)
-                                .font(.system(size: 14))
-                            
-                            Text(category.name)
-                                .font(themeManager.captionFont)
-                                .foregroundColor(themeManager.textPrimaryColor)
-                            
-                            Spacer()
-                        }
-                    }
+    // MARK: - Bottom Action Buttons
+    
+    private var bottomActionButtons: some View {
+        VStack(spacing: 12) {
+            // Stats button
+            Button {
+                showStats = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "chart.bar.fill")
+                    Text("View Stats")
                 }
+                .font(themeManager.buttonFont)
+                .foregroundColor(themeManager.accent)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(themeManager.cardBackgroundColor)
+                .clipShape(RoundedRectangle(cornerRadius: themeManager.cornerRadiusMedium))
+                .overlay(
+                    RoundedRectangle(cornerRadius: themeManager.cornerRadiusMedium)
+                        .stroke(themeManager.accent, lineWidth: 2)
+                )
+            }
+            
+            // New Block button
+            Button {
+                showNewBlock = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "plus.circle.fill")
+                    Text("New Block")
+                }
+                .font(themeManager.buttonFont)
+                .foregroundColor(themeManager.accentColor == .mono ?
+                    Color(light: .white, dark: .black) : .white)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 14)
+                .background(themeManager.accent)
+                .clipShape(RoundedRectangle(cornerRadius: themeManager.cornerRadiusMedium))
             }
         }
-    }
-    
-    private var statsSection: some View {
-        HStack(spacing: 12) {
-            statCard(
-                title: "Scheduled",
-                value: "\(totalScheduledHours)h",
-                icon: "calendar"
-            )
-            
-            statCard(
-                title: "Completed",
-                value: "\(completedBlocks)",
-                icon: "checkmark.circle"
-            )
-            
-            statCard(
-                title: "Remaining",
-                value: "\(remainingBlocks)",
-                icon: "clock"
-            )
-        }
-    }
-    
-    private func statCard(title: String, value: String, icon: String) -> some View {
-        AppCard(padding: 12) {
-            VStack(spacing: 8) {
-                Image(systemName: icon)
-                    .font(.system(size: 20))
-                    .foregroundColor(themeManager.accent)
-                
-                Text(value)
-                    .font(themeManager.subtitleFont)
-                    .foregroundColor(themeManager.textPrimaryColor)
-                
-                Text(title)
-                    .font(themeManager.captionFont)
-                    .foregroundColor(themeManager.textSecondaryColor)
-            }
-            .frame(maxWidth: .infinity)
-        }
-    }
-    
-    // MARK: - Computed Properties
-    
-    private var totalScheduledHours: Int {
-        let minutes = storeContainer.planStore.totalScheduledMinutesFor(date: currentDate)
-        return minutes / 60
-    }
-    
-    private var completedBlocks: Int {
-        timeBlocks.filter { $0.isDone }.count
-    }
-    
-    private var remainingBlocks: Int {
-        timeBlocks.filter { !$0.isDone && !$0.isPast }.count
     }
     
     // MARK: - Actions
     
     private func loadData() {
         timeBlocks = storeContainer.planStore.fetchBlocksFor(date: currentDate)
-        currentBlock = storeContainer.planStore.fetchCurrentBlock()
         loadUnscheduledTasks()
     }
     
@@ -254,6 +209,15 @@ struct TodayView: View {
         }
     }
     
+    private func createBlock(_ block: TimeBlock) {
+        if let created = storeContainer.planStore.createBlock(block) {
+            timeBlocks.append(created)
+            
+            let impact = UIImpactFeedbackGenerator(style: .medium)
+            impact.impactOccurred()
+        }
+    }
+    
     private func scheduleTask(_ task: Task) {
         let preferences = UserPreferences.load()
         let calendar = Calendar.current
@@ -264,14 +228,14 @@ struct TodayView: View {
         guard let startTime = calendar.date(from: components) else { return }
         
         let duration = TimeInterval(task.estimatedDuration * 60)
-        let proposedEnd = startTime.addingTimeInterval(duration)
+        let endTime = startTime.addingTimeInterval(duration)
         
         let block = TimeBlock(
             taskID: task.id,
             title: task.title,
             emoji: nil,
             startDate: startTime,
-            endDate: proposedEnd,
+            endDate: endTime,
             categoryID: task.categoryID,
             sourceType: .manual
         )

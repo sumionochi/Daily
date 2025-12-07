@@ -1,11 +1,3 @@
-//
-//  RadialDayView.swift
-//  Daily
-//
-//  Created by Aaditya Srivastava on 06/12/25.
-//
-
-
 // Features/Radial/RadialDayView.swift
 
 import SwiftUI
