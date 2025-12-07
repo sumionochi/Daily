@@ -1,5 +1,3 @@
-// Features/Radial/InteractiveRadialView.swift
-
 import SwiftUI
 import SwiftData
 
@@ -18,24 +16,28 @@ struct InteractiveRadialView: View {
     @State private var showBlockDetail = false
     @State private var conflicts: Set<UUID> = []
     
-    // Radial dimensions - refined
+    // Radial dimensions
     private let outerRadius: CGFloat
     private let innerRadius: CGFloat
-    private let arcThickness: CGFloat = 32
+    
+    // Inner “disc” radius (center area like competitor)
+    private var centerRadius: CGFloat {
+        max(innerRadius - 20, 0)
+    }
     
     init(date: Date, size: CGFloat = 360) {
         self.date = date
         self.size = size
         self.outerRadius = size / 2 - 20
-        self.innerRadius = outerRadius - 60 // Space for ticks
+        self.innerRadius = outerRadius - 60 // ring thickness ≈ 60pt
     }
     
     var body: some View {
         ZStack {
-            // Clock face with ticks
+            // Dial / tick marks
             RadialClockFace(radius: outerRadius)
             
-            // Time blocks as thin arcs
+            // Time blocks as ring segments
             ForEach(timeBlocks) { block in
                 if block.id != draggedBlock?.id {
                     RadialBlockView(
@@ -45,6 +47,7 @@ struct InteractiveRadialView: View {
                         category: block.categoryID != nil ? categories[block.categoryID!] : nil
                     )
                     .onTapGesture {
+                        // Select block + still open detail sheet (so editing UX stays)
                         selectedBlock = block
                         showBlockDetail = true
                     }
@@ -69,12 +72,17 @@ struct InteractiveRadialView: View {
                 .scaleEffect(1.02)
             }
             
+            // Center disc (like competitor’s big inner circle)
+            Circle()
+                .fill(themeManager.cardBackgroundColor.opacity(0.96))
+                .frame(width: centerRadius * 2, height: centerRadius * 2)
+            
             // Current time indicator
             if Calendar.current.isDateInToday(date) {
                 currentTimeIndicator
             }
             
-            // Center info
+            // Center content: selected block OR day summary
             centerInfo
         }
         .frame(width: size, height: size)
@@ -109,7 +117,7 @@ struct InteractiveRadialView: View {
         }
     }
     
-    // MARK: - Current Time Indicator
+    // MARK: - Current Time Indicator (line + small pill like competitor)
     
     private var currentTimeIndicator: some View {
         let calendar = Calendar.current
@@ -118,11 +126,18 @@ struct InteractiveRadialView: View {
         let angle = RadialLayoutEngine.angle(fromHour: hour, minute: minute)
         let angleRadians = (angle - 90) * .pi / 180
         
-        let startRadius: CGFloat = innerRadius - 10
-        let endRadius: CGFloat = outerRadius + 10
+        let startRadius: CGFloat = innerRadius
+        let endRadius: CGFloat = outerRadius
+        let pillRadius: CGFloat = outerRadius + 24
+        
+        let timeString = DateFormatter.localizedString(
+            from: currentTime,
+            dateStyle: .none,
+            timeStyle: .short
+        )
         
         return ZStack {
-            // Line
+            // Line across the ring
             Path { path in
                 let startX = startRadius * cos(angleRadians)
                 let startY = startRadius * sin(angleRadians)
@@ -134,7 +149,7 @@ struct InteractiveRadialView: View {
             }
             .stroke(themeManager.accent, lineWidth: 2)
             
-            // Dot at end
+            // Dot at end of line
             Circle()
                 .fill(themeManager.accent)
                 .frame(width: 8, height: 8)
@@ -142,39 +157,107 @@ struct InteractiveRadialView: View {
                     x: endRadius * cos(angleRadians),
                     y: endRadius * sin(angleRadians)
                 )
+            
+            // Time pill slightly outside the ring
+            Text(timeString)
+                .font(.system(size: 11, weight: .semibold, design: .rounded))
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(
+                    Capsule()
+                        .fill(Color.black.opacity(0.85))
+                )
+                .foregroundColor(.white)
+                .offset(
+                    x: pillRadius * cos(angleRadians),
+                    y: pillRadius * sin(angleRadians)
+                )
         }
     }
     
-    // MARK: - Center Info
+    // MARK: - Center Info (selected block vs day summary)
     
     private var centerInfo: some View {
-        VStack(spacing: 8) {
-            Text(date, format: .dateTime.weekday(.abbreviated))
-                        .font(.system(size: 14, weight: .semibold, design: .rounded))
-                        .foregroundColor(themeManager.textSecondaryColor)
-                        .textCase(.uppercase)
+        Group {
+            if let block = selectedBlock {
+                selectedBlockCenter(block)
+            } else {
+                daySummaryCenter
+            }
+        }
+        .allowsHitTesting(false)
+    }
+    
+    private func selectedBlockCenter(_ block: TimeBlock) -> some View {
+        let category = block.categoryID.flatMap { categories[$0] }
+        
+        return VStack(spacing: 8) {
+            if let emoji = block.emoji {
+                Text(emoji)
+                    .font(.system(size: 32))
+            }
+            
+            Text(block.title)
+                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                .foregroundColor(themeManager.textPrimaryColor)
+                .multilineTextAlignment(.center)
+                .lineLimit(2)
+                .frame(maxWidth: 180)
+            
+            Text(blockTimeRange(block))
+                .font(.system(size: 13, weight: .medium, design: .rounded))
+                .foregroundColor(themeManager.textSecondaryColor)
+            
+            if let category = category {
+                Text(category.name)
+                    .font(.system(size: 11, weight: .semibold, design: .rounded))
+                    .foregroundColor(categoryColorFor(category))
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(categoryColorFor(category).opacity(0.18))
+                    )
+            }
+        }
+    }
+    
+    private var daySummaryCenter: some View {
+        VStack(spacing: 6) {
+            Text(date, format: .dateTime.weekday(.wide))
+                .font(.system(size: 18, weight: .bold, design: .rounded))
+                .foregroundColor(themeManager.textPrimaryColor)
+                .textCase(.uppercase)
             
             Text("\(totalScheduledHours)h \(totalScheduledMinutes % 60)m scheduled")
                 .font(.system(size: 13, weight: .medium, design: .rounded))
                 .foregroundColor(themeManager.textTertiaryColor)
             
-            // Category summary
-            VStack(spacing: 4) {
-                ForEach(categorySummary.prefix(4), id: \.0.id) { category, minutes in
-                    HStack(spacing: 8) {
-                        Text(category.name.uppercased())
-                            .font(.system(size: 11, weight: .bold, design: .rounded))
-                            .foregroundColor(categoryColorFor(category))
-
-                        Text(formatMinutes(minutes))
-                            .font(.system(size: 11, weight: .medium, design: .rounded))
-                            .foregroundColor(themeManager.textSecondaryColor)
+            if !categorySummary.isEmpty {
+                VStack(spacing: 4) {
+                    ForEach(categorySummary.prefix(2), id: \.0.id) { category, minutes in
+                        HStack {
+                            Text(category.name.uppercased())
+                                .font(.system(size: 11, weight: .bold, design: .rounded))
+                                .foregroundColor(categoryColorFor(category))
+                            
+                            Spacer()
+                            
+                            Text(formatMinutes(minutes))
+                                .font(.system(size: 11, weight: .medium, design: .rounded))
+                                .foregroundColor(themeManager.textSecondaryColor)
+                        }
                     }
                 }
+                .padding(.top, 4)
             }
-            .padding(.top, 4)
         }
-        .allowsHitTesting(false)
+    }
+    
+    private func blockTimeRange(_ block: TimeBlock) -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return "\(formatter.string(from: block.startDate)) – \(formatter.string(from: block.endDate))"
     }
     
     // MARK: - Category Summary
@@ -286,7 +369,7 @@ struct InteractiveRadialView: View {
         var newConflicts: Set<UUID> = []
         
         for i in 0..<timeBlocks.count {
-            for j in (i+1)..<timeBlocks.count {
+            for j in (i + 1)..<timeBlocks.count {
                 let block1 = timeBlocks[i]
                 let block2 = timeBlocks[j]
                 
@@ -308,6 +391,14 @@ struct InteractiveRadialView: View {
         let allCategories = storeContainer.categoryStore.fetchAll()
         categories = Dictionary(uniqueKeysWithValues: allCategories.map { ($0.id, $0) })
         
+        // Default selection: current block today, otherwise first block
+        if Calendar.current.isDateInToday(date),
+           let current = storeContainer.planStore.fetchCurrentBlock() {
+            selectedBlock = current
+        } else {
+            selectedBlock = timeBlocks.first
+        }
+        
         detectConflicts()
     }
     
@@ -324,6 +415,7 @@ struct InteractiveRadialView: View {
             if let index = timeBlocks.firstIndex(where: { $0.id == updated.id }) {
                 timeBlocks[index] = updated
             }
+            selectedBlock = updated
             detectConflicts()
         }
     }
@@ -331,6 +423,9 @@ struct InteractiveRadialView: View {
     private func deleteBlock(_ block: TimeBlock) {
         if storeContainer.planStore.deleteBlock(block.id) {
             timeBlocks.removeAll { $0.id == block.id }
+            if selectedBlock?.id == block.id {
+                selectedBlock = timeBlocks.first
+            }
             detectConflicts()
         }
     }
@@ -338,8 +433,7 @@ struct InteractiveRadialView: View {
 
 #Preview {
     ZStack {
-        Color.black
-            .ignoresSafeArea()
+        Color.black.ignoresSafeArea()
         
         InteractiveRadialView(date: Date(), size: 360)
     }

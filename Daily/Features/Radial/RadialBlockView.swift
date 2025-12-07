@@ -10,17 +10,19 @@ struct RadialBlockView: View {
     let outerRadius: CGFloat
     let category: Category?
     
-    private let arcThickness: CGFloat = 32 // Thinner arcs
-    
     var body: some View {
         ZStack {
-            // The arc
+            // Main arc
             arcShape
                 .fill(categoryColor.opacity(block.isDone ? 0.4 : 1.0))
             
-            // Block label (outside the arc)
-            if sweepAngle > 10 {
-                blockLabel
+            // Subtle separator stroke to make segments feel like one premium ring
+            arcShape
+                .stroke(Color.black.opacity(0.35), lineWidth: 0.5)
+            
+            // Optional emoji in the middle of the segment (no noisy outer labels)
+            if let emoji = block.emoji, sweepAngle > 10 {
+                emojiLabel(emoji: emoji)
             }
         }
     }
@@ -32,45 +34,27 @@ struct RadialBlockView: View {
             startAngle: RadialLayoutEngine.swiftUIAngle(block.startAngle),
             endAngle: RadialLayoutEngine.swiftUIAngle(block.endAngle),
             innerRadius: innerRadius,
-            outerRadius: innerRadius + arcThickness
+            outerRadius: outerRadius   // <- use the full ring thickness passed in
         )
     }
     
-    // MARK: - Block Label
+    // MARK: - Emoji on the ring
     
-    private var blockLabel: some View {
+    private func emojiLabel(emoji: String) -> some View {
         let midAngle = (block.startAngle + block.endAngle) / 2
-        let angleRadians = (midAngle - 90) * .pi / 180 // Adjust for top-start
+        let angleRadians = (midAngle - 90) * .pi / 180
         
-        // Position label outside the arc
-        let labelRadius = outerRadius + 40
-        let x = labelRadius * cos(angleRadians)
-        let y = labelRadius * sin(angleRadians)
+        // Place emoji in the middle of the ring thickness
+        let radius = (innerRadius + outerRadius) / 2
+        let x = radius * cos(angleRadians)
+        let y = radius * sin(angleRadians)
         
-        // Calculate rotation to make text readable
-        var textRotation = midAngle
-        if midAngle > 90 && midAngle < 270 {
-            textRotation += 180 // Flip text on left side
-        }
-        
-        return VStack(spacing: 2) {
-            if let emoji = block.emoji {
-                Text(emoji)
-                    .font(.system(size: 24))
-            }
-            
-            Text(block.title)
-                .font(.system(size: 12, weight: .semibold, design: .rounded))
-                .foregroundColor(themeManager.textPrimaryColor)
-                .lineLimit(2)
-                .multilineTextAlignment(.center)
-                .frame(width: 80)
-        }
-        .rotationEffect(.degrees(textRotation))
-        .offset(x: x, y: y)
+        return Text(emoji)
+            .font(.system(size: 18))
+            .offset(x: x, y: y)
     }
     
-    // MARK: - Computed Properties
+    // MARK: - Computed
     
     private var sweepAngle: Double {
         let sweep = block.endAngle - block.startAngle
@@ -141,17 +125,16 @@ struct ArcShape: Shape {
         title: "Deep Work",
         emoji: "🎯",
         startDate: Date(),
-        endDate: Date().addingTimeInterval(7200) // 2 hours
+        endDate: Date().addingTimeInterval(7200)
     )
     
     return ZStack {
-        Color.black
-            .ignoresSafeArea()
+        Color.black.ignoresSafeArea()
         
         RadialBlockView(
             block: block,
             innerRadius: 120,
-            outerRadius: 160,
+            outerRadius: 180,
             category: nil
         )
         .frame(width: 320, height: 320)
