@@ -1,16 +1,16 @@
-// Features/Today/Views/TodayView_Clean.swift
+// Features/Today/Views/TodayView.swift
 
 import SwiftUI
 import SwiftData
 
-enum TodayViewMode: String, CaseIterable {
+enum TodayTab: String, CaseIterable {
     case radial = "Radial"
-    case list = "List"
+    case schedule = "Schedule"
     
     var icon: String {
         switch self {
         case .radial: return "circle.circle"
-        case .list: return "list.bullet"
+        case .schedule: return "list.bullet"
         }
     }
 }
@@ -20,9 +20,8 @@ struct TodayView: View {
     @EnvironmentObject var storeContainer: StoreContainer
     
     @State private var currentDate = Date()
-    @State private var timeBlocks: [TimeBlock] = []
+    @State private var selectedTab: TodayTab = .radial
     @State private var unscheduledTasks: [Task] = []
-    @State private var viewMode: TodayViewMode = .radial
     @State private var showStats = false
     @State private var showNewBlock = false
     
@@ -31,15 +30,18 @@ struct TodayView: View {
             AppBackgroundView()
             
             VStack(spacing: 0) {
-                // Date navigation with view mode toggle
+                // Date navigation
                 headerSection
                 
-                // Main content based on mode
+                // Tab selector
+                tabSelector
+                
+                // Content based on selected tab
                 Group {
-                    if viewMode == .radial {
-                        radialModeContent
+                    if selectedTab == .radial {
+                        radialContent
                     } else {
-                        listModeContent
+                        scheduleContent
                     }
                 }
                 
@@ -65,86 +67,95 @@ struct TodayView: View {
             }
         }
         .onAppear {
-            loadData()
+            loadUnscheduledTasks()
         }
         .onChange(of: currentDate) { _, _ in
-            loadData()
+            loadUnscheduledTasks()
         }
     }
     
     // MARK: - Header Section
     
     private var headerSection: some View {
-        VStack(spacing: 12) {
-            // Date navigation
-            HStack {
-                IconButton(icon: "chevron.left") {
-                    changeDate(by: -1)
-                }
-                
-                Spacer()
-                
-                VStack(spacing: 2) {
-                    Text(currentDate, format: .dateTime.weekday(.wide))
-                        .font(themeManager.captionFont)
-                        .foregroundColor(themeManager.textSecondaryColor)
-                    
-                    Text(currentDate, format: .dateTime.month().day().year())
-                        .font(themeManager.titleFont)
-                        .foregroundColor(themeManager.textPrimaryColor)
-                }
-                
-                Spacer()
-                
-                IconButton(icon: "chevron.right") {
-                    changeDate(by: 1)
-                }
+        HStack {
+            IconButton(icon: "chevron.left") {
+                changeDate(by: -1)
             }
             
-            // View mode toggle
-            HStack {
-                ForEach(TodayViewMode.allCases, id: \.self) { mode in
-                    Button {
-                        withAnimation(.easeInOut(duration: 0.2)) {
-                            viewMode = mode
-                        }
-                    } label: {
-                        HStack(spacing: 6) {
-                            Image(systemName: mode.icon)
-                                .font(.system(size: 14))
-                            Text(mode.rawValue)
-                                .font(themeManager.captionFont)
-                        }
-                        .foregroundColor(viewMode == mode ? themeManager.textOnAccentColor : themeManager.textPrimaryColor)
-                        .frame(maxWidth: .infinity)
-                        .padding(.vertical, 10)
-                        .background(viewMode == mode ? themeManager.accent : themeManager.cardBackgroundColor)
-                        .clipShape(RoundedRectangle(cornerRadius: 8))
-                    }
-                }
+            Spacer()
+            
+            VStack(spacing: 2) {
+                Text(currentDate, format: .dateTime.weekday(.wide))
+                    .font(themeManager.captionFont)
+                    .foregroundColor(themeManager.textSecondaryColor)
+                
+                Text(currentDate, format: .dateTime.month().day().year())
+                    .font(themeManager.titleFont)
+                    .foregroundColor(themeManager.textPrimaryColor)
             }
-            .padding(.horizontal, 60)
+            
+            Spacer()
+            
+            IconButton(icon: "chevron.right") {
+                changeDate(by: 1)
+            }
         }
         .padding(.horizontal)
         .padding(.top)
     }
     
-    // MARK: - Radial Mode Content
+    // MARK: - Tab Selector
     
-    private var radialModeContent: some View {
+    private var tabSelector: some View {
+        HStack(spacing: 12) {
+            ForEach(TodayTab.allCases, id: \.self) { tab in
+                Button {
+                    withAnimation(.easeInOut(duration: 0.2)) {
+                        selectedTab = tab
+                    }
+                } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: tab.icon)
+                            .font(.system(size: 14))
+                        Text(tab.rawValue)
+                            .font(themeManager.captionFont)
+                    }
+                    .foregroundColor(selectedTab == tab ?
+                        (themeManager.accentColor == .mono ?
+                            Color(light: .white, dark: .black) : .white) :
+                        themeManager.textPrimaryColor)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 10)
+                    .background(selectedTab == tab ?
+                        themeManager.accent : themeManager.cardBackgroundColor)
+                    .clipShape(RoundedRectangle(cornerRadius: 8))
+                }
+            }
+        }
+        .padding(.horizontal)
+        .padding(.vertical, 12)
+    }
+    
+    // MARK: - Radial Content
+    
+    private var radialContent: some View {
         ScrollView {
             VStack(spacing: 20) {
-                // Interactive radial planner (clean, no stats)
                 InteractiveRadialView(date: currentDate, size: 360)
+                    .frame(maxWidth: .infinity, alignment: .center)
+                    .padding(.horizontal)
                     .padding(.vertical, 20)
             }
         }
     }
     
-    // MARK: - List Mode Content
+    // MARK: - Schedule Content
     
-    private var listModeContent: some View {
-        TodayListView(date: currentDate)
+    private var scheduleContent: some View {
+        ScrollView {
+            TodayScheduledView(date: currentDate)
+                .padding(.bottom, 80) // Extra padding for buttons
+        }
     }
     
     // MARK: - Bottom Action Buttons
@@ -192,12 +203,8 @@ struct TodayView: View {
     
     // MARK: - Actions
     
-    private func loadData() {
-        timeBlocks = storeContainer.planStore.fetchBlocksFor(date: currentDate)
-        loadUnscheduledTasks()
-    }
-    
     private func loadUnscheduledTasks() {
+        let timeBlocks = storeContainer.planStore.fetchBlocksFor(date: currentDate)
         let allUnscheduled = storeContainer.taskStore.fetchUnscheduled()
         let todayBlockTaskIDs = Set(timeBlocks.compactMap { $0.taskID })
         unscheduledTasks = allUnscheduled.filter { !todayBlockTaskIDs.contains($0.id) }
@@ -211,8 +218,6 @@ struct TodayView: View {
     
     private func createBlock(_ block: TimeBlock) {
         if let created = storeContainer.planStore.createBlock(block) {
-            timeBlocks.append(created)
-            
             let impact = UIImpactFeedbackGenerator(style: .medium)
             impact.impactOccurred()
         }
@@ -241,7 +246,6 @@ struct TodayView: View {
         )
         
         if let created = storeContainer.planStore.createBlock(block) {
-            timeBlocks.append(created)
             loadUnscheduledTasks()
             
             let impact = UIImpactFeedbackGenerator(style: .medium)

@@ -26,8 +26,7 @@ class SeedDataService {
         
         print("Seeding initial data...")
         seedCategories()
-        seedSampleTasks()
-        seedSampleDay()
+        seedSampleTasksAndBlocks() // Updated to link tasks and blocks
         print("Seed complete!")
     }
     
@@ -39,64 +38,9 @@ class SeedDataService {
         print("Seeded \(categories.count) default categories")
     }
     
-    // MARK: - Seed Sample Tasks
+    // MARK: - Seed Sample Tasks & Blocks (SYNCED)
     
-    private func seedSampleTasks() {
-        let categories = categoryStore.fetchAll()
-        guard !categories.isEmpty else { return }
-        
-        let focusCategory = categories.first { $0.name == "Focus" }
-        let adminCategory = categories.first { $0.name == "Admin" }
-        let healthCategory = categories.first { $0.name == "Health" }
-        let breakCategory = categories.first { $0.name == "Break" }
-        
-        let sampleTasks: [Task] = [
-            Task(
-                title: "Review project proposal",
-                notes: "Check budget and timeline",
-                estimatedDuration: 45,
-                categoryID: focusCategory?.id,
-                priority: .high,
-                dueDate: Date()
-            ),
-            Task(
-                title: "Respond to client emails",
-                estimatedDuration: 30,
-                categoryID: adminCategory?.id,
-                priority: .medium,
-                dueDate: Date()
-            ),
-            Task(
-                title: "Morning workout",
-                estimatedDuration: 60,
-                categoryID: healthCategory?.id,
-                priority: .medium
-            ),
-            Task(
-                title: "Team standup meeting",
-                estimatedDuration: 15,
-                categoryID: adminCategory?.id,
-                priority: .medium,
-                dueDate: Date()
-            ),
-            Task(
-                title: "Lunch break",
-                estimatedDuration: 60,
-                categoryID: breakCategory?.id,
-                priority: .low
-            )
-        ]
-        
-        for task in sampleTasks {
-            taskStore.create(task)
-        }
-        
-        print("Seeded \(sampleTasks.count) sample tasks")
-    }
-    
-    // MARK: - Seed Sample Day
-    
-    private func seedSampleDay() {
+    private func seedSampleTasksAndBlocks() {
         let categories = categoryStore.fetchAll()
         guard !categories.isEmpty else { return }
         
@@ -109,43 +53,66 @@ class SeedDataService {
         let today = Date()
         var components = calendar.dateComponents([.year, .month, .day], from: today)
         
-        // Create sample blocks for today
-        let sampleBlocks: [(hour: Int, minute: Int, duration: Int, title: String, emoji: String, categoryID: UUID?)] = [
-            (7, 0, 60, "Morning Routine", "☀️", healthCategory?.id),
-            (8, 0, 30, "Breakfast", "🍳", breakCategory?.id),
-            (9, 0, 120, "Deep Work Session", "🎯", focusCategory?.id),
-            (11, 0, 30, "Coffee Break", "☕️", breakCategory?.id),
-            (11, 30, 90, "Team Meeting", "👥", adminCategory?.id),
-            (13, 0, 60, "Lunch", "🍱", breakCategory?.id),
-            (14, 0, 120, "Focus Work", "💻", focusCategory?.id),
-            (16, 0, 30, "Quick Break", "🚶", breakCategory?.id),
-            (16, 30, 90, "Project Planning", "📋", adminCategory?.id),
-            (18, 0, 60, "Evening Workout", "💪", healthCategory?.id),
-            (19, 0, 60, "Dinner", "🍽", breakCategory?.id),
-            (20, 0, 90, "Personal Time", "📚", breakCategory?.id),
-            (22, 0, 480, "Sleep", "😴", nil)
+        // Sample data: (hour, minute, duration, title, emoji, category, shouldCreateTask)
+        let sampleData: [(hour: Int, minute: Int, duration: Int, title: String, emoji: String, category: Category?, createTask: Bool)] = [
+            (7, 0, 60, "Morning Routine", "☀️", healthCategory, true),
+            (8, 0, 30, "Breakfast", "🍳", breakCategory, false),
+            (9, 0, 120, "Deep Work Session", "🎯", focusCategory, true),
+            (11, 0, 30, "Coffee Break", "☕️", breakCategory, false),
+            (11, 30, 90, "Team Meeting", "👥", adminCategory, true),
+            (13, 0, 60, "Lunch", "🍱", breakCategory, false),
+            (14, 0, 120, "Focus Work", "💻", focusCategory, true),
+            (16, 0, 30, "Quick Break", "🚶", breakCategory, false),
+            (16, 30, 90, "Project Planning", "📋", adminCategory, true),
+            (18, 0, 60, "Evening Workout", "💪", healthCategory, true),
+            (19, 0, 60, "Dinner", "🍽", breakCategory, false),
+            (20, 0, 90, "Personal Time", "📚", breakCategory, false),
+            (22, 0, 480, "Sleep", "😴", nil, false)
         ]
         
-        for blockData in sampleBlocks {
-            components.hour = blockData.hour
-            components.minute = blockData.minute
+        var createdCount = 0
+        
+        for data in sampleData {
+            components.hour = data.hour
+            components.minute = data.minute
             
             guard let startDate = calendar.date(from: components) else { continue }
-            let endDate = startDate.addingTimeInterval(TimeInterval(blockData.duration * 60))
+            let endDate = startDate.addingTimeInterval(TimeInterval(data.duration * 60))
             
+            var taskID: UUID? = nil
+            
+            // Create task if needed (for work-related items)
+            if data.createTask {
+                let task = Task(
+                    title: data.title,
+                    notes: nil,
+                    estimatedDuration: data.duration,
+                    categoryID: data.category?.id,
+                    priority: .medium,
+                    dueDate: today
+                )
+                
+                if let createdTask = taskStore.create(task) {
+                    taskID = createdTask.id
+                }
+            }
+            
+            // Create block (always)
             let block = TimeBlock(
-                title: blockData.title,
-                emoji: blockData.emoji,
+                taskID: taskID, // Link to task if created
+                title: data.title,
+                emoji: data.emoji,
                 startDate: startDate,
                 endDate: endDate,
-                categoryID: blockData.categoryID,
+                categoryID: data.category?.id,
                 sourceType: .manual
             )
             
             planStore.createBlock(block)
+            createdCount += 1
         }
         
-        print("Seeded \(sampleBlocks.count) sample time blocks for today")
+        print("Seeded \(createdCount) sample blocks (some linked to tasks)")
     }
     
     // MARK: - Clear All Data
