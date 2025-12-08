@@ -141,10 +141,11 @@ struct TodayView: View {
     private var radialContent: some View {
         ScrollView {
             VStack(spacing: 20) {
-                InteractiveRadialView(date: currentDate, size: 360)
-                    .frame(maxWidth: .infinity, alignment: .center)
-                    .padding(.horizontal)
-                    .padding(.vertical, 20)
+                InteractiveRadialView(
+                    date: currentDate,
+                    size: 360,
+                    storeContainer: storeContainer
+                )
             }
         }
     }
