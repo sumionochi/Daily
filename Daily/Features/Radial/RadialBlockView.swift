@@ -1,4 +1,4 @@
-// Features/Radial/RadialBlockView.swift
+// Features/Radial/Views/RadialBlockView.swift
 
 import SwiftUI
 
@@ -10,19 +10,34 @@ struct RadialBlockView: View {
     let outerRadius: CGFloat
     let category: Category?
     
+    private let arcThickness: CGFloat = 32
+    private let borderWidth: CGFloat = 2
+    
     var body: some View {
         ZStack {
-            // Main arc
+            // Transparent fill
             arcShape
-                .fill(categoryColor.opacity(block.isDone ? 0.4 : 1.0))
+                .fill(categoryColor.opacity(fillOpacity))
             
-            // Subtle separator stroke to make segments feel like one premium ring
+            // Opaque border
             arcShape
-                .stroke(Color.black.opacity(0.35), lineWidth: 0.5)
+                .stroke(categoryColor, lineWidth: borderWidth)
             
-            // Optional emoji in the middle of the segment (no noisy outer labels)
-            if let emoji = block.emoji, sweepAngle > 10 {
-                emojiLabel(emoji: emoji)
+            // Completion overlay (if done)
+            if block.isDone {
+                BlockCompletionOverlay(
+                    isDone: block.isDone,
+                    categoryColor: categoryColor,
+                    innerRadius: innerRadius,
+                    arcThickness: arcThickness,
+                    startAngle: block.startAngle,
+                    endAngle: block.endAngle
+                )
+            }
+            
+            // Content (emoji + text) inside the arc
+            if sweepAngle > 15 {
+                arcContent
             }
         }
     }
@@ -31,30 +46,74 @@ struct RadialBlockView: View {
     
     private var arcShape: ArcShape {
         ArcShape(
-            startAngle: RadialLayoutEngine.swiftUIAngle(block.startAngle),
-            endAngle: RadialLayoutEngine.swiftUIAngle(block.endAngle),
+            startAngle: swiftUIAngle(block.startAngle),
+            endAngle: swiftUIAngle(block.endAngle),
             innerRadius: innerRadius,
-            outerRadius: outerRadius   // <- use the full ring thickness passed in
+            outerRadius: innerRadius + arcThickness
         )
     }
     
-    // MARK: - Emoji on the ring
+    // Convert our angle system (0° = top) to SwiftUI's (0° = right)
+    private func swiftUIAngle(_ degrees: Double) -> Angle {
+        Angle(degrees: degrees - 90)
+    }
     
-    private func emojiLabel(emoji: String) -> some View {
+    // MARK: - Arc Content
+    
+    private var arcContent: some View {
         let midAngle = (block.startAngle + block.endAngle) / 2
         let angleRadians = (midAngle - 90) * .pi / 180
         
-        // Place emoji in the middle of the ring thickness
-        let radius = (innerRadius + outerRadius) / 2
-        let x = radius * cos(angleRadians)
-        let y = radius * sin(angleRadians)
+        // Position in the middle of the arc
+        let contentRadius = innerRadius + (arcThickness / 2)
+        let x = contentRadius * cos(angleRadians)
+        let y = contentRadius * sin(angleRadians)
         
-        return Text(emoji)
-            .font(.system(size: 18))
+        // Calculate rotation for readability
+        var rotation = midAngle
+        if midAngle > 90 && midAngle < 270 {
+            rotation += 180 // Flip on left side
+        }
+        
+        return contentView
+            .rotationEffect(.degrees(rotation))
             .offset(x: x, y: y)
     }
     
-    // MARK: - Computed
+    // MARK: - Content View
+    
+    private var contentView: some View {
+        VStack(spacing: 2) {
+            // Adaptive emoji
+            if let emoji = block.emoji {
+                AdaptiveArcEmoji(emoji: emoji, sweepAngle: sweepAngle)
+            }
+            
+            // Adaptive text label (only if enough space)
+            if sweepAngle > 30 {
+                AdaptiveArcText(
+                    text: block.title,
+                    sweepAngle: sweepAngle,
+                    color: textColor
+                )
+            }
+        }
+    }
+    
+    // MARK: - Computed Properties
+    
+    private var fillOpacity: Double {
+        if block.isDone {
+            return 0.2
+        } else {
+            return 0.35 // Transparent but visible
+        }
+    }
+    
+    private var textColor: Color {
+        // Use high contrast for readability
+        return themeManager.textPrimaryColor
+    }
     
     private var sweepAngle: Double {
         let sweep = block.endAngle - block.startAngle
@@ -125,19 +184,18 @@ struct ArcShape: Shape {
         title: "Deep Work",
         emoji: "🎯",
         startDate: Date(),
-        endDate: Date().addingTimeInterval(7200)
+        endDate: Date().addingTimeInterval(3600),
+        categoryID: nil
     )
     
     return ZStack {
-        Color.black.ignoresSafeArea()
-        
+        Color.black
         RadialBlockView(
             block: block,
-            innerRadius: 120,
+            innerRadius: 140,
             outerRadius: 180,
             category: nil
         )
-        .frame(width: 320, height: 320)
+        .environmentObject(ThemeManager())
     }
-    .environmentObject(ThemeManager())
 }

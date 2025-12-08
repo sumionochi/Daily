@@ -1,11 +1,3 @@
-//
-//  InnerPlaceUnfocused.swift
-//  Daily
-//
-//  Created by Aaditya Srivastava on 08/12/25.
-//
-
-
 // Features/Radial/Views/InnerPlaceUnfocused.swift
 
 import SwiftUI

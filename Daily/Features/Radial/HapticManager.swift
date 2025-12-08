@@ -1,11 +1,3 @@
-//
-//  HapticManager.swift
-//  Daily
-//
-//  Created by Aaditya Srivastava on 08/12/25.
-//
-
-
 // Features/Radial/Utilities/HapticManager.swift
 
 import UIKit
