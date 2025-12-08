@@ -1,8 +1,8 @@
 // Features/Radial/InteractiveRadialView.swift
 
 import SwiftUI
-import Combine
 import SwiftData
+import Combine
 
 struct InteractiveRadialView: View {
     @EnvironmentObject var themeManager: ThemeManager
@@ -57,22 +57,21 @@ struct InteractiveRadialView: View {
     }
     
     // MARK: - Blocks Layer
-    
+
     private var blocksLayer: some View {
-        ForEach(viewModel.blocks) { block in
-            RadialBlockWithFocus(
-                block: block,
-                category: getCategoryForBlock(block),
-                innerRadius: innerRadius,
-                outerRadius: outerRadius,
-                isFocused: viewModel.isBlockFocused(block.id),
-                isDimmed: viewModel.state.isFocused && !viewModel.isBlockFocused(block.id),
-                onTap: {
-                    handleBlockTap(block)
-                }
-            )
+        ZStack {
+            ForEach(viewModel.blocks) { block in
+                InteractiveRadialBlock(
+                    viewModel: viewModel,
+                    block: block,
+                    category: getCategoryForBlock(block),
+                    innerRadius: innerRadius,
+                    outerRadius: outerRadius
+                )
+            }
         }
     }
+
     
     // MARK: - Current Time Indicator
     
@@ -89,10 +88,6 @@ struct InteractiveRadialView: View {
         guard let categoryID = block.categoryID else { return nil }
         return storeContainer.categoryStore.fetchAll().first { $0.id == categoryID }
     }
-    
-    private func handleBlockTap(_ block: TimeBlock) {
-        viewModel.toggleFocus(for: block.id)
-    }
 }
 
 // MARK: - Current Time Indicator (Simple)
@@ -102,33 +97,38 @@ struct CurrentTimeIndicatorView: View {
     let currentDate: Date
     
     @State private var currentTime = Date()
-    private let timer = Timer.publish(every: 1, on: .main, in: .common).autoconnect()
+    private let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
     
     var body: some View {
-        let angle = RadialGeometry.timeToAngle(currentTime)
-        let point = RadialGeometry.angleToPoint(angle, radius: outerRadius, center: .zero)
-        
-        ZStack {
-            // Radial line
-            Path { path in
-                path.move(to: .zero)
-                path.addLine(to: point)
-            }
-            .stroke(Color.green, lineWidth: 2)
-            .shadow(color: .green.opacity(0.5), radius: 4)
+        GeometryReader { proxy in
+            let center = CGPoint(x: proxy.size.width / 2,
+                                 y: proxy.size.height / 2)
+            let angle = RadialGeometry.timeToAngle(currentTime)
+            let point = RadialGeometry.angleToPoint(angle,
+                                                    radius: outerRadius,
+                                                    center: center)
             
-            // Dot at end
-            Circle()
-                .fill(Color.green)
-                .frame(width: 8, height: 8)
-                .position(x: point.x, y: point.y)
+            ZStack {
+                Path { path in
+                    path.move(to: center)
+                    path.addLine(to: point)
+                }
+                .stroke(Color.green, lineWidth: 2)
                 .shadow(color: .green.opacity(0.5), radius: 4)
+                
+                Circle()
+                    .fill(Color.green)
+                    .frame(width: 8, height: 8)
+                    .position(x: point.x, y: point.y)
+                    .shadow(color: .green.opacity(0.5), radius: 4)
+            }
         }
         .onReceive(timer) { _ in
             currentTime = Date()
         }
     }
 }
+
 
 #Preview {
     let container = ModelContainer.createPreview()

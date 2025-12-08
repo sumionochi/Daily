@@ -61,18 +61,18 @@ struct RadialBlockView: View {
     // MARK: - Arc Content
     
     private var arcContent: some View {
-        let midAngle = (block.startAngle + block.endAngle) / 2
-        let angleRadians = (midAngle - 90) * .pi / 180
+        let mid = midAngleAlongArc(start: block.startAngle, end: block.endAngle)
+        let angleRadians = (mid - 90) * .pi / 180
         
-        // Position in the middle of the arc
+        // Position in the middle of the arc band
         let contentRadius = innerRadius + (arcThickness / 2)
         let x = contentRadius * cos(angleRadians)
         let y = contentRadius * sin(angleRadians)
         
-        // Calculate rotation for readability
-        var rotation = midAngle
-        if midAngle > 90 && midAngle < 270 {
-            rotation += 180 // Flip on left side
+        // Rotation for readability (flip on left side)
+        var rotation = mid
+        if mid > 90 && mid < 270 {
+            rotation += 180
         }
         
         return contentView
@@ -84,12 +84,10 @@ struct RadialBlockView: View {
     
     private var contentView: some View {
         VStack(spacing: 2) {
-            // Adaptive emoji
             if let emoji = block.emoji {
                 AdaptiveArcEmoji(emoji: emoji, sweepAngle: sweepAngle)
             }
             
-            // Adaptive text label (only if enough space)
             if sweepAngle > 30 {
                 AdaptiveArcText(
                     text: block.title,
@@ -103,21 +101,16 @@ struct RadialBlockView: View {
     // MARK: - Computed Properties
     
     private var fillOpacity: Double {
-        if block.isDone {
-            return 0.2
-        } else {
-            return 0.35 // Transparent but visible
-        }
+        block.isDone ? 0.2 : 0.35
     }
     
     private var textColor: Color {
-        // Use high contrast for readability
-        return themeManager.textPrimaryColor
+        themeManager.textPrimaryColor
     }
     
+    /// Correct sweep (handles midnight crossing)
     private var sweepAngle: Double {
-        let sweep = block.endAngle - block.startAngle
-        return sweep >= 0 ? sweep : sweep + 360
+        block.sweepAngle       // uses RadialLayoutEngine.sweepAngle(for:)
     }
     
     private var categoryColor: Color {
@@ -126,14 +119,26 @@ struct RadialBlockView: View {
         }
         
         switch category.colorID {
-        case "blue": return Color(red: 0.4, green: 0.6, blue: 1.0)
+        case "blue":   return Color(red: 0.4, green: 0.6, blue: 1.0)
         case "purple": return Color(red: 0.7, green: 0.5, blue: 1.0)
-        case "pink": return Color(red: 1.0, green: 0.5, blue: 0.7)
+        case "pink":   return Color(red: 1.0, green: 0.5, blue: 0.7)
         case "orange": return Color(red: 1.0, green: 0.6, blue: 0.4)
-        case "green": return Color(red: 0.5, green: 0.9, blue: 0.6)
-        case "teal": return Color(red: 0.4, green: 0.8, blue: 0.9)
-        default: return themeManager.accent
+        case "green":  return Color(red: 0.5, green: 0.9, blue: 0.6)
+        case "teal":   return Color(red: 0.4, green: 0.8, blue: 0.9)
+        default:       return themeManager.accent
         }
+    }
+    
+    // MARK: - Angle Helpers
+    
+    /// Returns the mid-angle *along the arc*, correctly handling wrap-around.
+    private func midAngleAlongArc(start: Double, end: Double) -> Double {
+        var sweep = end - start
+        if sweep < 0 { sweep += 360 }                // cross-midnight case
+        var mid = start + sweep / 2
+        mid = mid.truncatingRemainder(dividingBy: 360)
+        if mid < 0 { mid += 360 }
+        return mid
     }
 }
 
@@ -174,28 +179,6 @@ struct ArcShape: Shape {
         )
         
         path.closeSubpath()
-        
         return path
-    }
-}
-
-#Preview {
-    let block = TimeBlock(
-        title: "Deep Work",
-        emoji: "🎯",
-        startDate: Date(),
-        endDate: Date().addingTimeInterval(3600),
-        categoryID: nil
-    )
-    
-    return ZStack {
-        Color.black
-        RadialBlockView(
-            block: block,
-            innerRadius: 140,
-            outerRadius: 180,
-            category: nil
-        )
-        .environmentObject(ThemeManager())
     }
 }

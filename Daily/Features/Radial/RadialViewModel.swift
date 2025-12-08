@@ -5,9 +5,6 @@
 //  Created by Aaditya Srivastava on 08/12/25.
 //
 
-
-// Features/Radial/ViewModels/RadialViewModel.swift
-
 import SwiftUI
 import Combine
 
@@ -21,10 +18,12 @@ class RadialViewModel: ObservableObject {
     @Published var interactionMode: RadialInteractionMode = .idle
     @Published var timeSnapInterval: TimeSnapInterval = .fifteenMinutes
     
-    // MARK: - Data
-    
+    // Data
     @Published var blocks: [TimeBlock] = []
     @Published var statistics: DayStatistics?
+    
+    // Editing
+    @Published var editingBlockID: UUID? = nil
     
     // MARK: - Dependencies
     
@@ -33,7 +32,6 @@ class RadialViewModel: ObservableObject {
     
     // MARK: - Private State
     
-    private var lastSnapTime: Date?
     private var cancellables = Set<AnyCancellable>()
     
     // MARK: - Initialization
@@ -80,6 +78,25 @@ class RadialViewModel: ObservableObject {
         }
     }
     
+    // MARK: - Editing
+    
+    func beginEditingBlock(blockID: UUID) {
+        // Ensure block exists
+        guard getBlock(by: blockID) != nil else { return }
+        
+        // Always focus when editing
+        if !isBlockFocused(blockID) {
+            focusBlock(blockID)
+        }
+        
+        editingBlockID = blockID
+        hapticManager.trigger(.blockEdit)
+    }
+    
+    func endEditingBlock() {
+        editingBlockID = nil
+    }
+    
     // MARK: - Day Navigation
     
     func goToPreviousDay() {
@@ -102,6 +119,7 @@ class RadialViewModel: ObservableObject {
         withAnimation(.easeInOut(duration: 0.3)) {
             currentDate = newDate
             state = .unfocused // Clear focus when changing days
+            editingBlockID = nil
         }
         
         hapticManager.trigger(.dayChange)
@@ -118,18 +136,13 @@ class RadialViewModel: ObservableObject {
         }
         
         let newStartTime = angleToTime(angle, for: currentDate)
-        let snappedTime = snapToInterval(newStartTime)
-        
-        // Check if we crossed a snap boundary
-        if let lastSnap = lastSnapTime, lastSnap != snappedTime {
-            hapticManager.dialTick()
-        }
-        lastSnapTime = snappedTime
+        let snappedStart = snapToInterval(newStartTime)
         
         var block = blocks[index]
         let duration = block.duration
-        block.startDate = snappedTime
-        block.endDate = snappedTime.addingTimeInterval(duration)
+        
+        block.startDate = snappedStart
+        block.endDate = snappedStart.addingTimeInterval(duration)
         
         blocks[index] = block
     }
@@ -144,24 +157,12 @@ class RadialViewModel: ObservableObject {
         if let startAngle = newStartAngle {
             let newStart = angleToTime(startAngle, for: currentDate)
             let snappedStart = snapToInterval(newStart)
-            
-            if let lastSnap = lastSnapTime, lastSnap != snappedStart {
-                hapticManager.dialTick()
-            }
-            lastSnapTime = snappedStart
-            
             block.startDate = snappedStart
         }
         
         if let endAngle = newEndAngle {
             let newEnd = angleToTime(endAngle, for: currentDate)
             let snappedEnd = snapToInterval(newEnd)
-            
-            if let lastSnap = lastSnapTime, lastSnap != snappedEnd {
-                hapticManager.dialTick()
-            }
-            lastSnapTime = snappedEnd
-            
             block.endDate = snappedEnd
         }
         
@@ -187,10 +188,6 @@ class RadialViewModel: ObservableObject {
     
     func setInteractionMode(_ mode: RadialInteractionMode) {
         interactionMode = mode
-        
-        if case .idle = mode {
-            lastSnapTime = nil
-        }
     }
     
     // MARK: - Data Loading

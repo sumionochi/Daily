@@ -1,5 +1,3 @@
-// Features/Radial/Views/BlockCompletionOverlay.swift
-
 import SwiftUI
 
 struct BlockCompletionOverlay: View {
@@ -12,18 +10,15 @@ struct BlockCompletionOverlay: View {
     
     var body: some View {
         if isDone {
-            ZStack {
-                // Checkmark in center
-                checkmarkIcon
-            }
+            checkmarkIcon
         }
     }
     
     // MARK: - Checkmark Icon
     
     private var checkmarkIcon: some View {
-        let midAngle = (startAngle + endAngle) / 2
-        let angleRadians = (midAngle - 90) * .pi / 180
+        let mid = midAngleAlongArc(start: startAngle, end: endAngle)
+        let angleRadians = (mid - 90) * .pi / 180
         
         let contentRadius = innerRadius + (arcThickness / 2)
         let x = contentRadius * cos(angleRadians)
@@ -39,9 +34,17 @@ struct BlockCompletionOverlay: View {
             )
             .offset(x: x, y: y)
     }
+    
+    // Shared helper
+    private func midAngleAlongArc(start: Double, end: Double) -> Double {
+        var sweep = end - start
+        if sweep < 0 { sweep += 360 }
+        var mid = start + sweep / 2
+        mid = mid.truncatingRemainder(dividingBy: 360)
+        if mid < 0 { mid += 360 }
+        return mid
+    }
 }
-
-// MARK: - Strikethrough Overlay
 
 struct BlockStrikethroughOverlay: View {
     let isDone: Bool
@@ -53,7 +56,6 @@ struct BlockStrikethroughOverlay: View {
     
     var body: some View {
         if isDone {
-            // Diagonal line through the arc
             strikethroughLine
                 .stroke(Color.white.opacity(0.5), lineWidth: 2)
         }
@@ -61,8 +63,8 @@ struct BlockStrikethroughOverlay: View {
     
     private var strikethroughLine: some Shape {
         Path { path in
-            let midAngle = (startAngle + endAngle) / 2
-            let angleRadians = (midAngle - 90) * .pi / 180
+            let mid = midAngleAlongArc(start: startAngle, end: endAngle)
+            let angleRadians = (mid - 90) * .pi / 180
             
             let innerPoint = CGPoint(
                 x: innerRadius * cos(angleRadians),
@@ -78,25 +80,13 @@ struct BlockStrikethroughOverlay: View {
             path.addLine(to: outerPoint)
         }
     }
-}
-
-#Preview {
-    ZStack {
-        Color.black
-        
-        // Sample arc with completion overlay
-        Circle()
-            .trim(from: 0, to: 0.3)
-            .stroke(Color.blue, lineWidth: 32)
-            .frame(width: 300, height: 300)
-        
-        BlockCompletionOverlay(
-            isDone: true,
-            categoryColor: .blue,
-            innerRadius: 118,
-            arcThickness: 32,
-            startAngle: 0,
-            endAngle: 108
-        )
+    
+    private func midAngleAlongArc(start: Double, end: Double) -> Double {
+        var sweep = end - start
+        if sweep < 0 { sweep += 360 }
+        var mid = start + sweep / 2
+        mid = mid.truncatingRemainder(dividingBy: 360)
+        if mid < 0 { mid += 360 }
+        return mid
     }
 }

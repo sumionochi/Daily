@@ -1,11 +1,3 @@
-//
-//  NewTaskSheet.swift
-//  Daily
-//
-//  Created by Aaditya Srivastava on 06/12/25.
-//
-
-
 // Features/Inbox/Views/NewTaskSheet.swift
 
 import SwiftUI
