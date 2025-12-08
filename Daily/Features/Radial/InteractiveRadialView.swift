@@ -1,8 +1,8 @@
 // Features/Radial/InteractiveRadialView.swift
 
 import SwiftUI
-import SwiftData
 import Combine
+import SwiftData
 
 struct InteractiveRadialView: View {
     @EnvironmentObject var themeManager: ThemeManager
@@ -60,16 +60,17 @@ struct InteractiveRadialView: View {
     
     private var blocksLayer: some View {
         ForEach(viewModel.blocks) { block in
-            RadialBlockView(
+            RadialBlockWithFocus(
                 block: block,
+                category: getCategoryForBlock(block),
                 innerRadius: innerRadius,
                 outerRadius: outerRadius,
-                category: getCategoryForBlock(block)
+                isFocused: viewModel.isBlockFocused(block.id),
+                isDimmed: viewModel.state.isFocused && !viewModel.isBlockFocused(block.id),
+                onTap: {
+                    handleBlockTap(block)
+                }
             )
-            .opacity(blockOpacity(for: block))
-            .onTapGesture {
-                handleBlockTap(block)
-            }
         }
     }
     
@@ -87,15 +88,6 @@ struct InteractiveRadialView: View {
     private func getCategoryForBlock(_ block: TimeBlock) -> Category? {
         guard let categoryID = block.categoryID else { return nil }
         return storeContainer.categoryStore.fetchAll().first { $0.id == categoryID }
-    }
-    
-    private func blockOpacity(for block: TimeBlock) -> Double {
-        switch viewModel.state {
-        case .unfocused:
-            return 1.0
-        case .focused(let focusedID):
-            return block.id == focusedID ? 1.0 : 0.3 // Dim unfocused blocks
-        }
     }
     
     private func handleBlockTap(_ block: TimeBlock) {
