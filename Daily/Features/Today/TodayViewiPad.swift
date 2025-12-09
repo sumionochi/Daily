@@ -1,11 +1,3 @@
-//
-//  TodayViewiPad.swift
-//  Daily
-//
-//  Created by Aaditya Srivastava on 06/12/25.
-//
-
-
 // Features/Today/Views/TodayViewiPad.swift
 
 import SwiftUI
@@ -18,8 +10,12 @@ struct TodayViewiPad: View {
     @State private var currentDate = Date()
     @State private var timeBlocks: [TimeBlock] = []
     @State private var unscheduledTasks: [Task] = []
+    
     @State private var selectedBlock: TimeBlock?
     @State private var showBlockDetail = false
+    
+    @State private var showStats = false
+    @State private var showNewBlock = false
     
     var body: some View {
         GeometryReader { geometry in
@@ -45,6 +41,21 @@ struct TodayViewiPad: View {
         .onChange(of: currentDate) { _, _ in
             loadData()
         }
+        // Keep schedule side in sync with radial edits
+        .onReceive(NotificationCenter.default.publisher(for: NSNotification.Name("BlocksUpdated"))) { _ in
+            loadData()
+        }
+        // Stats sheet (same as TodayView)
+        .sheet(isPresented: $showStats) {
+            DayStatsPopup(date: currentDate)
+        }
+        // Quick new block sheet (same as TodayView)
+        .sheet(isPresented: $showNewBlock) {
+            QuickTaskSheet(date: currentDate) { block in
+                createBlock(block)
+            }
+        }
+        // Block detail sheet for iPad
         .sheet(isPresented: $showBlockDetail) {
             if let selected = selectedBlock {
                 BlockDetailSheet(
@@ -71,20 +82,25 @@ struct TodayViewiPad: View {
             
             Spacer()
             
-            // Radial planner (larger for iPad)
+            // Radial planner (larger for iPad, shared radial system)
             InteractiveRadialViewiPad(
                 date: currentDate,
                 size: 450,
-                onBlockTapped: { block in
-                    selectedBlock = block
-                    showBlockDetail = true
-                }
-            )
+                storeContainer: storeContainer
+            ) { block in
+                // Called when a block enters edit mode from the radial
+                selectedBlock = block
+                showBlockDetail = true
+            }
             
             Spacer()
             
             // Stats row
             statsSection
+                .padding(.horizontal, 30)
+            
+            // Bottom actions like phone TodayView
+            bottomActionButtons
                 .padding(.horizontal, 30)
                 .padding(.bottom, 20)
         }
@@ -126,7 +142,7 @@ struct TodayViewiPad: View {
         .background(themeManager.secondaryBackgroundColor.opacity(0.3))
     }
     
-    // MARK: - Components
+    // MARK: - Components (Left Panel)
     
     private var dateNavigationBar: some View {
         HStack {
@@ -194,6 +210,51 @@ struct TodayViewiPad: View {
             .frame(maxWidth: .infinity)
         }
     }
+    
+    private var bottomActionButtons: some View {
+        HStack(spacing: 12) {
+            // Stats button
+            Button {
+                showStats = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "chart.bar.fill")
+                    Text("View Stats")
+                }
+                .font(themeManager.buttonFont)
+                .foregroundColor(themeManager.accent)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(themeManager.cardBackgroundColor)
+                .clipShape(RoundedRectangle(cornerRadius: themeManager.cornerRadiusMedium))
+                .overlay(
+                    RoundedRectangle(cornerRadius: themeManager.cornerRadiusMedium)
+                        .stroke(themeManager.accent, lineWidth: 2)
+                )
+            }
+            
+            // New Block button
+            Button {
+                showNewBlock = true
+            } label: {
+                HStack(spacing: 8) {
+                    Image(systemName: "plus.circle.fill")
+                    Text("New Block")
+                }
+                .font(themeManager.buttonFont)
+                .foregroundColor(
+                    themeManager.accentColor == .mono ?
+                    Color(light: .white, dark: .black) : .white
+                )
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 12)
+                .background(themeManager.accent)
+                .clipShape(RoundedRectangle(cornerRadius: themeManager.cornerRadiusMedium))
+            }
+        }
+    }
+    
+    // MARK: - Components (Right Panel)
     
     private var unscheduledSection: some View {
         VStack(alignment: .leading, spacing: 12) {
@@ -275,7 +336,7 @@ struct TodayViewiPad: View {
     }
     
     private func iPadBlockRow(block: TimeBlock) -> some View {
-        let category = block.categoryID != nil ? 
+        let category = block.categoryID != nil ?
             storeContainer.categoryStore.fetchByID(block.categoryID!) : nil
         
         return AppCard(padding: 12) {
@@ -371,7 +432,7 @@ struct TodayViewiPad: View {
         timeBlocks.filter { !$0.isDone && !$0.isPast }.count
     }
     
-    // MARK: - Actions
+    // MARK: - Data & Actions
     
     private func loadData() {
         timeBlocks = storeContainer.planStore.fetchBlocksFor(date: currentDate)
@@ -380,6 +441,8 @@ struct TodayViewiPad: View {
     
     private func loadUnscheduledTasks() {
         let allUnscheduled = storeContainer.taskStore.fetchUnscheduled()
+        
+        // Same "unscheduled" definition as TodayView
         let todayBlockTaskIDs = Set(timeBlocks.compactMap { $0.taskID })
         unscheduledTasks = allUnscheduled.filter { !todayBlockTaskIDs.contains($0.id) }
     }
@@ -421,17 +484,29 @@ struct TodayViewiPad: View {
         }
     }
     
+    private func createBlock(_ block: TimeBlock) {
+        if let created = storeContainer.planStore.createBlock(block) {
+            timeBlocks.append(created)
+            loadUnscheduledTasks()
+            
+            let impact = UIImpactFeedbackGenerator(style: .medium)
+            impact.impactOccurred()
+        }
+    }
+    
     private func updateBlock(_ block: TimeBlock) {
         if let updated = storeContainer.planStore.updateBlock(block) {
             if let index = timeBlocks.firstIndex(where: { $0.id == updated.id }) {
                 timeBlocks[index] = updated
             }
+            loadUnscheduledTasks()
         }
     }
     
     private func deleteBlock(_ block: TimeBlock) {
         if storeContainer.planStore.deleteBlock(block.id) {
             timeBlocks.removeAll { $0.id == block.id }
+            loadUnscheduledTasks()
         }
     }
 }

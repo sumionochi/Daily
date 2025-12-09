@@ -6,24 +6,60 @@ struct RadialBlockView: View {
     @EnvironmentObject var themeManager: ThemeManager
     
     let block: TimeBlock
-    let innerRadius: CGFloat
-    let outerRadius: CGFloat
+    let innerRadius: CGFloat      // ring inner radius
+    let outerRadius: CGFloat      // not used for drawing, but kept for consistency
     let category: Category?
     
-    private let arcThickness: CGFloat = 32
+    // Visual tuning
+    private let arcThickness: CGFloat = 32      // thickness of the “pill”
     private let borderWidth: CGFloat = 2
     
     var body: some View {
+        let bubbleArc = BubblyArcShape(
+            startAngle: block.startAngle,
+            endAngle: block.endAngle,
+            radius: innerRadius + arcThickness / 2,
+            lineWidth: arcThickness
+        )
+        
         ZStack {
-            // Transparent fill
-            arcShape
-                .fill(categoryColor.opacity(fillOpacity))
+            // Bubbly, soft, semi-transparent fill
+            bubbleArc
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            categoryColor.opacity(fillOpacity * 1.05),
+                            categoryColor.opacity(fillOpacity)
+                        ],
+                        startPoint: .top,
+                        endPoint: .bottom
+                    )
+                )
+                .shadow(color: categoryColor.opacity(0.30), radius: 6)
             
-            // Opaque border
-            arcShape
-                .stroke(categoryColor, lineWidth: borderWidth)
+            // Soft border (slight inner highlight + color edge)
+            bubbleArc
+                .stroke(
+                    Color.white.opacity(0.20),
+                    style: StrokeStyle(
+                        lineWidth: borderWidth,
+                        lineCap: .butt,
+                        lineJoin: .round
+                    )
+                )
+                .overlay(
+                    bubbleArc
+                        .stroke(
+                            categoryColor.opacity(0.85),
+                            style: StrokeStyle(
+                                lineWidth: 0.75,
+                                lineCap: .butt,
+                                lineJoin: .round
+                            )
+                        )
+                )
             
-            // Completion overlay (if done)
+            // Completion overlay (still positioned in the arc)
             if block.isDone {
                 BlockCompletionOverlay(
                     isDone: block.isDone,
@@ -42,52 +78,43 @@ struct RadialBlockView: View {
         }
     }
     
-    // MARK: - Arc Shape
-    
-    private var arcShape: ArcShape {
-        ArcShape(
-            startAngle: swiftUIAngle(block.startAngle),
-            endAngle: swiftUIAngle(block.endAngle),
-            innerRadius: innerRadius,
-            outerRadius: innerRadius + arcThickness
-        )
-    }
-    
-    // Convert our angle system (0° = top) to SwiftUI's (0° = right)
-    private func swiftUIAngle(_ degrees: Double) -> Angle {
-        Angle(degrees: degrees - 90)
-    }
-    
     // MARK: - Arc Content
-    
+
     private var arcContent: some View {
-        let mid = midAngleAlongArc(start: block.startAngle, end: block.endAngle)
-        let angleRadians = (mid - 90) * .pi / 180
+        // Use true sweep (handles midnight crossing)
+        let sweep = sweepAngle
         
-        // Position in the middle of the arc band
+        // Midpoint *along the arc path*, not simple average
+        var midAngle = block.startAngle + sweep / 2.0
+        
+        // Normalize to 0–360
+        midAngle = midAngle.truncatingRemainder(dividingBy: 360)
+        if midAngle < 0 { midAngle += 360 }
+        
+        let angleRadians = (midAngle - 90) * .pi / 180
+        
+        // Position in the middle of the arc thickness
         let contentRadius = innerRadius + (arcThickness / 2)
         let x = contentRadius * cos(angleRadians)
         let y = contentRadius * sin(angleRadians)
         
-        // Rotation for readability (flip on left side)
-        var rotation = mid
-        if mid > 90 && mid < 270 {
-            rotation += 180
-        }
-        
+        // Keep content upright (no rotation around the tangent)
         return contentView
-            .rotationEffect(.degrees(rotation))
+            .rotationEffect(.degrees(0))
             .offset(x: x, y: y)
     }
+
     
     // MARK: - Content View
     
     private var contentView: some View {
         VStack(spacing: 2) {
+            // Adaptive emoji
             if let emoji = block.emoji {
                 AdaptiveArcEmoji(emoji: emoji, sweepAngle: sweepAngle)
             }
             
+            // Adaptive text label (only if enough space)
             if sweepAngle > 30 {
                 AdaptiveArcText(
                     text: block.title,
@@ -101,16 +128,21 @@ struct RadialBlockView: View {
     // MARK: - Computed Properties
     
     private var fillOpacity: Double {
-        block.isDone ? 0.2 : 0.35
+        // Less transparent (more solid color) than before
+        if block.isDone {
+            return 0.45
+        } else {
+            return 0.70
+        }
     }
     
     private var textColor: Color {
         themeManager.textPrimaryColor
     }
     
-    /// Correct sweep (handles midnight crossing)
     private var sweepAngle: Double {
-        block.sweepAngle       // uses RadialLayoutEngine.sweepAngle(for:)
+        let sweep = block.endAngle - block.startAngle
+        return sweep >= 0 ? sweep : sweep + 360
     }
     
     private var categoryColor: Color {
@@ -128,57 +160,64 @@ struct RadialBlockView: View {
         default:       return themeManager.accent
         }
     }
-    
-    // MARK: - Angle Helpers
-    
-    /// Returns the mid-angle *along the arc*, correctly handling wrap-around.
-    private func midAngleAlongArc(start: Double, end: Double) -> Double {
-        var sweep = end - start
-        if sweep < 0 { sweep += 360 }                // cross-midnight case
-        var mid = start + sweep / 2
-        mid = mid.truncatingRemainder(dividingBy: 360)
-        if mid < 0 { mid += 360 }
-        return mid
-    }
 }
 
-// MARK: - Arc Shape
+// MARK: - Bubbly arc shape with rounded caps
 
-struct ArcShape: Shape {
-    let startAngle: Angle
-    let endAngle: Angle
-    let innerRadius: CGFloat
-    let outerRadius: CGFloat
+/// Draws a single circular arc as a thick stroke with rounded caps,
+/// giving a "pill" / bubbly look around the ring.
+struct BubblyArcShape: Shape {
+    /// Angles are in the radial system (0° = top, clockwise).
+    let startAngle: Double
+    let endAngle: Double
+    let radius: CGFloat
+    let lineWidth: CGFloat
     
     func path(in rect: CGRect) -> Path {
         var path = Path()
         let center = CGPoint(x: rect.midX, y: rect.midY)
         
-        // Outer arc
+        // Convert to SwiftUI coordinate system (0° = right, CCW)
+        let start = Angle(degrees: startAngle - 90)
+        let end   = Angle(degrees: endAngle - 90)
+        
         path.addArc(
             center: center,
-            radius: outerRadius,
-            startAngle: startAngle,
-            endAngle: endAngle,
+            radius: radius,
+            startAngle: start,
+            endAngle: end,
             clockwise: false
         )
         
-        // Line to inner arc start
-        path.addLine(to: CGPoint(
-            x: center.x + innerRadius * CGFloat(cos(endAngle.radians)),
-            y: center.y + innerRadius * CGFloat(sin(endAngle.radians))
-        ))
-        
-        // Inner arc (reverse direction)
-        path.addArc(
-            center: center,
-            radius: innerRadius,
-            startAngle: endAngle,
-            endAngle: startAngle,
-            clockwise: true
+        // Stroke with rounded caps to get the "bubble" ends
+        return path.strokedPath(
+            StrokeStyle(
+                lineWidth: lineWidth,
+                lineCap: .butt,
+                lineJoin: .round
+            )
         )
+    }
+}
+
+#Preview {
+    let block = TimeBlock(
+        title: "Deep Work",
+        emoji: "🎯",
+        startDate: Date(),
+        endDate: Date().addingTimeInterval(3600),
+        categoryID: nil
+    )
+    
+    return ZStack {
+        Color.black
         
-        path.closeSubpath()
-        return path
+        RadialBlockView(
+            block: block,
+            innerRadius: 140,
+            outerRadius: 180,
+            category: nil
+        )
+        .environmentObject(ThemeManager())
     }
 }

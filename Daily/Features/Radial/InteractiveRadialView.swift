@@ -76,10 +76,15 @@ struct InteractiveRadialView: View {
     // MARK: - Current Time Indicator
     
     private var currentTimeIndicator: some View {
-        CurrentTimeIndicatorView(
-            outerRadius: outerRadius,
-            currentDate: viewModel.currentDate
-        )
+        Group {
+            if Calendar.current.isDateInToday(viewModel.currentDate) {
+                CurrentTimeIndicatorView(
+                    innerRadius: innerRadius,
+                    outerRadius: outerRadius
+                )
+                .allowsHitTesting(false)
+            }
+        }
     }
     
     // MARK: - Helpers
@@ -90,37 +95,82 @@ struct InteractiveRadialView: View {
     }
 }
 
-// MARK: - Current Time Indicator (Simple)
+// MARK: - Current Time Indicator (Watch-style)
 
 struct CurrentTimeIndicatorView: View {
+    @EnvironmentObject var themeManager: ThemeManager
+
+    let innerRadius: CGFloat
     let outerRadius: CGFloat
-    let currentDate: Date
-    
+
     @State private var currentTime = Date()
     private let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
-    
+
     var body: some View {
         GeometryReader { proxy in
             let center = CGPoint(x: proxy.size.width / 2,
                                  y: proxy.size.height / 2)
+
             let angle = RadialGeometry.timeToAngle(currentTime)
-            let point = RadialGeometry.angleToPoint(angle,
-                                                    radius: outerRadius,
-                                                    center: center)
-            
+
+            // Needle from inner edge of ring to outer edge
+            let needleStart = RadialGeometry.angleToPoint(
+                angle,
+                radius: innerRadius,
+                center: center
+            )
+            let needleEnd = RadialGeometry.angleToPoint(
+                angle,
+                radius: outerRadius,
+                center: center
+            )
+
+            // Time label just inside the ring, slightly offset
+            let labelRadius = outerRadius - 24
+            let labelPoint = RadialGeometry.angleToPoint(
+                angle,
+                radius: labelRadius,
+                center: center
+            )
+
             ZStack {
+                // Glowing needle
                 Path { path in
-                    path.move(to: center)
-                    path.addLine(to: point)
+                    path.move(to: needleStart)
+                    path.addLine(to: needleEnd)
                 }
-                .stroke(Color.green, lineWidth: 2)
-                .shadow(color: .green.opacity(0.5), radius: 4)
-                
+                .stroke(
+                    themeManager.accent,
+                    style: StrokeStyle(
+                        lineWidth: 3.5,
+                        lineCap: .round
+                    )
+                )
+                .shadow(color: themeManager.accent.opacity(0.7), radius: 6)
+
+                // Tip dot
                 Circle()
-                    .fill(Color.green)
-                    .frame(width: 8, height: 8)
-                    .position(x: point.x, y: point.y)
-                    .shadow(color: .green.opacity(0.5), radius: 4)
+                    .fill(themeManager.accent)
+                    .frame(width: 10, height: 10)
+                    .position(needleEnd)
+                    .shadow(color: themeManager.accent.opacity(0.8), radius: 8)
+
+                // Time capsule
+                Text(currentTime, format: .dateTime.hour().minute())
+                    .font(.system(size: 12, weight: .semibold, design: .rounded))
+                    .foregroundColor(themeManager.textPrimaryColor)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 4)
+                    .background(
+                        Capsule()
+                            .fill(themeManager.backgroundColor.opacity(0.92))
+                    )
+                    .overlay(
+                        Capsule()
+                            .stroke(themeManager.accent.opacity(0.8), lineWidth: 1)
+                    )
+                    .shadow(color: Color.black.opacity(0.35), radius: 4)
+                    .position(labelPoint)
             }
         }
         .onReceive(timer) { _ in
@@ -128,7 +178,6 @@ struct CurrentTimeIndicatorView: View {
         }
     }
 }
-
 
 #Preview {
     let container = ModelContainer.createPreview()

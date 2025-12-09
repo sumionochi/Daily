@@ -1,5 +1,7 @@
 // Features/Radial/Views/InnerPlace.swift
 
+// Features/Radial/Views/InnerPlace.swift
+
 import SwiftUI
 import SwiftData
 
@@ -38,13 +40,17 @@ struct InnerPlace: View {
                     }
                 }
             }
-            .animation(.spring(response: 0.35, dampingFraction: 0.75), value: viewModel.state)
+            .animation(.spring(response: 0.35, dampingFraction: 0.75),
+                       value: viewModel.state)
         }
         .daySwipeGesture(viewModel: viewModel)
         .onTapGesture {
-            // Tap inner place when focused → unfocus
-            if viewModel.state.isFocused {
-                viewModel.unfocus()
+            // When focused: tap inner circle → open edit sheet
+            switch viewModel.state {
+            case .focused(let blockID):
+                viewModel.beginEditingBlock(blockID: blockID)
+            case .unfocused:
+                break
             }
         }
     }

@@ -1,9 +1,4 @@
-//
-//  RadialViewModel.swift
-//  Daily
-//
-//  Created by Aaditya Srivastava on 08/12/25.
-//
+// Features/Radial/ViewModels/RadialViewModel.swift
 
 import SwiftUI
 import Combine
@@ -33,6 +28,7 @@ class RadialViewModel: ObservableObject {
     // MARK: - Private State
     
     private var cancellables = Set<AnyCancellable>()
+    private let secondsInDay: TimeInterval = 24 * 60 * 60
     
     // MARK: - Initialization
     
@@ -65,9 +61,25 @@ class RadialViewModel: ObservableObject {
         
         withAnimation(.easeInOut(duration: 0.25)) {
             state = .unfocused
+            editingBlockID = nil
         }
         
         hapticManager.trigger(.blockUnfocus)
+    }
+    
+    // Features/Radial/ViewModels/RadialViewModel.swift
+
+    func commitBlock(_ updatedBlock: TimeBlock) {
+        guard let index = blocks.firstIndex(where: { $0.id == updatedBlock.id }) else {
+            return
+        }
+
+        // Update in-memory array once
+        blocks[index] = updatedBlock
+
+        // Persist to store
+        _ = storeContainer.planStore.updateBlock(updatedBlock)
+        NotificationCenter.default.post(name: NSNotification.Name("BlocksUpdated"), object: nil)
     }
     
     func toggleFocus(for blockID: UUID) {
@@ -130,46 +142,85 @@ class RadialViewModel: ObservableObject {
     
     // MARK: - Block Operations
     
+    /// Drag the whole block around the dial, preserving duration (even across midnight).
     func moveBlock(_ blockID: UUID, toAngle angle: Double) {
         guard let index = blocks.firstIndex(where: { $0.id == blockID }) else {
             return
         }
         
+        var block = blocks[index]
+        
+        // Duration in 24h-wrapped sense (so 22:00 → 02:00 is 4h, not negative).
+        let originalDuration = normalizedDuration(from: block.startDate, to: block.endDate)
+        
         let newStartTime = angleToTime(angle, for: currentDate)
         let snappedStart = snapToInterval(newStartTime)
         
-        var block = blocks[index]
-        let duration = block.duration
-        
         block.startDate = snappedStart
-        block.endDate = snappedStart.addingTimeInterval(duration)
+        block.endDate = snappedStart.addingTimeInterval(originalDuration)
         
         blocks[index] = block
     }
     
+    /// Resize by dragging either start or end handle. Handles wrap through 00 gracefully.
     func resizeBlock(_ blockID: UUID, newStartAngle: Double? = nil, newEndAngle: Double? = nil) {
         guard let index = blocks.firstIndex(where: { $0.id == blockID }) else {
             return
         }
         
         var block = blocks[index]
+        let calendar = Calendar.current
         
+        var changedStart = false
+        var changedEnd = false
+        
+        // Resize start
         if let startAngle = newStartAngle {
             let newStart = angleToTime(startAngle, for: currentDate)
             let snappedStart = snapToInterval(newStart)
             block.startDate = snappedStart
+            changedStart = true
         }
         
+        // Resize end
         if let endAngle = newEndAngle {
-            let newEnd = angleToTime(endAngle, for: currentDate)
-            let snappedEnd = snapToInterval(newEnd)
-            block.endDate = snappedEnd
+            // Time-of-day for the handle position
+            let endTOD = angleToTime(endAngle, for: currentDate)
+            let snappedTOD = snapToInterval(endTOD)
+            
+            // Candidate 1: same day as currentDate
+            let sameDayEnd = snappedTOD
+            
+            // Candidate 2: next day (for crossing midnight)
+            let nextDayEnd = calendar.date(byAdding: .day, value: 1, to: sameDayEnd)!
+            
+            // Pick whichever is closer to the *current* endDate
+            let diffSame = abs(sameDayEnd.timeIntervalSince(block.endDate))
+            let diffNext = abs(nextDayEnd.timeIntervalSince(block.endDate))
+            
+            let chosenEnd = (diffSame <= diffNext) ? sameDayEnd : nextDayEnd
+            block.endDate = chosenEnd
+            changedEnd = true
         }
         
-        // Ensure minimum duration (e.g. 15 minutes)
-        let minDuration: TimeInterval = 15 * 60
-        if block.duration < minDuration {
-            block.endDate = block.startDate.addingTimeInterval(minDuration)
+        // Enforce minimum duration in wrapped 24h sense
+        let minDuration = timeSnapInterval.seconds
+        var duration = normalizedDuration(from: block.startDate, to: block.endDate)
+        
+        if duration < minDuration {
+            if changedStart && !changedEnd {
+                // We moved the start; clamp start so that end stays fixed.
+                block.startDate = block.endDate.addingTimeInterval(-minDuration)
+            } else {
+                // Default: clamp end relative to start.
+                block.endDate = block.startDate.addingTimeInterval(minDuration)
+            }
+            duration = minDuration
+        }
+        
+        // Optional: clamp to max 24h to avoid weird over-long blocks
+        if duration > secondsInDay {
+            block.endDate = block.startDate.addingTimeInterval(secondsInDay)
         }
         
         blocks[index] = block
@@ -238,6 +289,7 @@ class RadialViewModel: ObservableObject {
     
     // MARK: - Time Utilities
     
+    /// Angle (0° = top, clockwise) → Date on a given day.
     private func angleToTime(_ angle: Double, for date: Date) -> Date {
         let calendar = Calendar.current
         var components = calendar.dateComponents([.year, .month, .day], from: date)
@@ -258,11 +310,16 @@ class RadialViewModel: ObservableObject {
         return calendar.date(from: components) ?? date
     }
     
+    /// Snap any Date to the current `timeSnapInterval` grid (within its day).
     private func snapToInterval(_ time: Date) -> Date {
         let calendar = Calendar.current
         let components = calendar.dateComponents([.year, .month, .day, .hour, .minute], from: time)
         
-        guard let hour = components.hour, let minute = components.minute else {
+        guard let year = components.year,
+              let month = components.month,
+              let day = components.day,
+              let hour = components.hour,
+              let minute = components.minute else {
             return time
         }
         
@@ -270,13 +327,49 @@ class RadialViewModel: ObservableObject {
         let snappedMinute = (minute / intervalMinutes) * intervalMinutes
         
         var snappedComponents = DateComponents()
-        snappedComponents.year = components.year
-        snappedComponents.month = components.month
-        snappedComponents.day = components.day
+        snappedComponents.year = year
+        snappedComponents.month = month
+        snappedComponents.day = day
         snappedComponents.hour = hour
         snappedComponents.minute = snappedMinute
         snappedComponents.second = 0
         
         return calendar.date(from: snappedComponents) ?? time
     }
+    
+    /// Duration in a 24h-wrapped sense (so 22:00 → 02:00 = 4h).
+    private func normalizedDuration(from start: Date, to end: Date) -> TimeInterval {
+        let raw = end.timeIntervalSince(start)
+        if raw >= 0 {
+            return raw
+        } else {
+            // Crosses midnight – treat end as “tomorrow”.
+            return raw + secondsInDay
+        }
+    }
+    
+    // Inside RadialViewModel class (recommended)
+    func focusNextOverlappingBlock(from baseBlockID: UUID) {
+        guard let baseBlock = blocks.first(where: { $0.id == baseBlockID }) else { return }
+
+        // All blocks that overlap in time with baseBlock
+        let overlapping = blocks.filter {
+            $0.id != baseBlock.id && $0.overlaps(with: baseBlock)
+        }
+        guard !overlapping.isEmpty else { return }
+
+        let sorted = overlapping.sorted { $0.startDate < $1.startDate }
+        let currentID = state.focusedBlockID
+
+        if let currentID,
+           let idx = sorted.firstIndex(where: { $0.id == currentID }) {
+            // Already focused one overlapping block → go to next
+            let nextIdx = (idx + 1) % sorted.count
+            focusBlock(sorted[nextIdx].id)
+        } else {
+            // First double-tap → focus the earliest overlapping block
+            focusBlock(sorted[0].id)
+        }
+    }
+
 }
