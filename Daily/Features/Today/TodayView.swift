@@ -43,7 +43,7 @@ struct TodayView: View {
                     } else {
                         scheduleContent
                     }
-                }
+                }.frame(maxWidth: .infinity, maxHeight: .infinity)
                 
                 // Bottom action buttons
                 bottomActionButtons
@@ -139,14 +139,19 @@ struct TodayView: View {
     // MARK: - Radial Content
     
     private var radialContent: some View {
-        ScrollView {
-            VStack(spacing: 20) {
+        GeometryReader { geo in
+            VStack {
+                Spacer()
+                
                 InteractiveRadialView(
                     date: currentDate,
                     size: 360,
                     storeContainer: storeContainer
                 )
+                
+                Spacer()
             }
+            .frame(width: geo.size.width, height: geo.size.height, alignment: .center)
         }
     }
     

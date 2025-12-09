@@ -27,7 +27,7 @@ struct InteractiveRadialBlock: View {
     @GestureState private var isPressingForDrag = false
 
     // Geometry constants
-    private let blockThickness: CGFloat = 32
+    private let blockThickness: CGFloat = 48
     private let secondsInDay: TimeInterval = 24 * 60 * 60
 
     private enum DragMode {

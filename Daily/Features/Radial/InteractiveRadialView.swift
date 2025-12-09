@@ -15,13 +15,14 @@ struct InteractiveRadialView: View {
     // Radial dimensions - refined
     private let outerRadius: CGFloat
     private let innerRadius: CGFloat
-    private let arcThickness: CGFloat = 32
+    private let blockRingThickness: CGFloat = 40       // same as above
+    private let blockGapToDial: CGFloat = 8
     
     init(date: Date, size: CGFloat = 360, storeContainer: StoreContainer) {
         self.size = size
         self.outerRadius = size / 2 - 20
-        self.innerRadius = outerRadius - 60 // Space for ticks
-        
+        self.innerRadius = outerRadius - blockGapToDial - blockRingThickness
+
         _viewModel = StateObject(wrappedValue: RadialViewModel(
             date: date,
             storeContainer: storeContainer
@@ -105,6 +106,12 @@ struct CurrentTimeIndicatorView: View {
 
     @State private var currentTime = Date()
     private let timer = Timer.publish(every: 60, on: .main, in: .common).autoconnect()
+    
+    private static let timeFormatter: DateFormatter = {
+        let formatter = DateFormatter()
+        formatter.dateFormat = "HH:mm"
+        return formatter
+    }()
 
     var body: some View {
         GeometryReader { proxy in
@@ -126,7 +133,9 @@ struct CurrentTimeIndicatorView: View {
             )
 
             // Time label just inside the ring, slightly offset
-            let labelRadius = outerRadius - 24
+            let capsuleRadialOffset: CGFloat = 6
+
+            let labelRadius = outerRadius + capsuleRadialOffset
             let labelPoint = RadialGeometry.angleToPoint(
                 angle,
                 radius: labelRadius,
@@ -149,28 +158,28 @@ struct CurrentTimeIndicatorView: View {
                 .shadow(color: themeManager.accent.opacity(0.7), radius: 6)
 
                 // Tip dot
-                Circle()
-                    .fill(themeManager.accent)
-                    .frame(width: 10, height: 10)
-                    .position(needleEnd)
-                    .shadow(color: themeManager.accent.opacity(0.8), radius: 8)
+//                Circle()
+//                    .fill(themeManager.accent)
+//                    .frame(width: 10, height: 10)
+//                    .position(needleEnd)
+//                    .shadow(color: themeManager.accent.opacity(0.8), radius: 8)
 
                 // Time capsule
-                Text(currentTime, format: .dateTime.hour().minute())
-                    .font(.system(size: 12, weight: .semibold, design: .rounded))
-                    .foregroundColor(themeManager.textPrimaryColor)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 4)
+                Text(Self.timeFormatter.string(from: currentTime))
+                    .font(.system(size: 10, weight: .semibold, design: .rounded))
+                    .foregroundColor(themeManager.accent)
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 2)
                     .background(
                         Capsule()
                             .fill(themeManager.backgroundColor.opacity(0.92))
                     )
                     .overlay(
                         Capsule()
-                            .stroke(themeManager.accent.opacity(0.8), lineWidth: 1)
+                            .stroke(themeManager.accent.opacity(0.8), lineWidth: 0.6)
                     )
-                    .shadow(color: Color.black.opacity(0.35), radius: 4)
                     .position(labelPoint)
+                    .offset(x: -8, y: -16)
             }
         }
         .onReceive(timer) { _ in

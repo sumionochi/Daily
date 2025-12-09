@@ -11,7 +11,7 @@ struct RadialBlockView: View {
     let category: Category?
     
     // Visual tuning
-    private let arcThickness: CGFloat = 32      // thickness of the “pill”
+    private let arcThickness: CGFloat = 48      // thickness of the “pill”
     private let borderWidth: CGFloat = 2
     
     var body: some View {
@@ -112,15 +112,6 @@ struct RadialBlockView: View {
             // Adaptive emoji
             if let emoji = block.emoji {
                 AdaptiveArcEmoji(emoji: emoji, sweepAngle: sweepAngle)
-            }
-            
-            // Adaptive text label (only if enough space)
-            if sweepAngle > 30 {
-                AdaptiveArcText(
-                    text: block.title,
-                    sweepAngle: sweepAngle,
-                    color: textColor
-                )
             }
         }
     }

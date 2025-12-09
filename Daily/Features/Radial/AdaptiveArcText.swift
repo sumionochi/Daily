@@ -63,19 +63,17 @@ struct AdaptiveArcEmoji: View {
     
     var body: some View {
         Text(emoji)
-            .font(adaptiveFont)
+            .font(.system(size: emojiSize))
     }
     
-    private var adaptiveFont: Font {
-        if sweepAngle > 90 {
-            return .system(size: 24)
-        } else if sweepAngle > 60 {
-            return .system(size: 20)
-        } else if sweepAngle > 30 {
-            return .system(size: 18)
-        } else {
-            return .system(size: 16)
-        }
+    private var emojiSize: CGFloat {
+        // base size – change this number to make the emoji bigger/smaller
+        let base: CGFloat = 28
+
+        // (Optional) slightly scale with block length
+        if sweepAngle > 90 { return base + 4 }
+        if sweepAngle > 45 { return base + 2 }
+        return base
     }
 }
 
