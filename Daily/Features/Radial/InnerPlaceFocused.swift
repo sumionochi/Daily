@@ -6,48 +6,60 @@ import SwiftData
 struct InnerPlaceFocused: View {
     @EnvironmentObject var themeManager: ThemeManager
     @EnvironmentObject var storeContainer: StoreContainer
-    
-    let block: TimeBlock
+
+    let block: TimeBlock          // original block (for id)
     @ObservedObject var viewModel: RadialViewModel
     let innerRadius: CGFloat
-    
+
     @State private var category: Category?
     @State private var pulseAnimation = false
-    
+
+    // Small static formatter for compact time range
+    private static let timeFormatter: DateFormatter = {
+        let f = DateFormatter()
+        f.dateFormat = "HH:mm"
+        return f
+    }()
+
+    /// Block that should be shown in the UI:
+    /// if there is a live preview while dragging, use that,
+    /// otherwise fall back to the original block.
+    private var displayedBlock: TimeBlock {
+        if let live = viewModel.liveEditingBlock,
+           live.id == block.id {
+            return live
+        } else {
+            return block
+        }
+    }
+
     var body: some View {
         ZStack {
-            // Background circle with subtle gradient
+            // Minimal flat circle
             Circle()
-                .fill(
-                    RadialGradient(
-                        colors: [
-                            themeManager.backgroundColor.opacity(0.98),
-                            themeManager.backgroundColor.opacity(0.92)
-                        ],
-                        center: .center,
-                        startRadius: 0,
-                        endRadius: innerRadius
-                    )
-                )
-                .frame(width: innerRadius * 2, height: innerRadius * 2)
-            
+                .fill(themeManager.backgroundColor.opacity(0.96))
+                .frame(width: innerRadius * 2,
+                       height: innerRadius * 2)
+
             VStack(spacing: 0) {
-                // Top icon (Sun)
-                sunIcon
-                    .padding(.top, 20)
-                
-                Spacer()
-                
-                // Main content
+                // Small top moon
+                topIcon
+                    .padding(.top, 10)
+
+                Spacer(minLength: 8)
+
+                // Main content (emoji, title, time, tag)
                 mainContent
-                
-                Spacer()
-                
-                // Bottom icon (Moon)
-                moonIcon
-                    .padding(.bottom, 20)
+                    .padding(.horizontal, 20)
+
+                Spacer(minLength: 8)
+
+                // Small bottom sun
+                bottomIcon
+                    .padding(.bottom, 10)
             }
-            .frame(width: innerRadius * 2, height: innerRadius * 2)
+            .frame(width: innerRadius * 2 * 0.9,
+                   height: innerRadius * 2 * 0.9)
         }
         .onAppear {
             loadCategory()
@@ -57,196 +69,135 @@ struct InnerPlaceFocused: View {
             loadCategory()
         }
     }
-    
-    // MARK: - Sun Icon
-    
-    private var sunIcon: some View {
-        Image(systemName: "sun.max.fill")
-            .font(.system(size: 18))
-            .foregroundColor(.orange.opacity(0.6))
-    }
-    
-    // MARK: - Moon Icon
-    
-    private var moonIcon: some View {
+
+    // MARK: - Top / bottom icons
+
+    private var topIcon: some View {
         Image(systemName: "moon.stars.fill")
-            .font(.system(size: 18))
-            .foregroundColor(.blue.opacity(0.6))
+            .font(.system(size: 14))
+            .foregroundColor(.blue.opacity(0.8))
     }
-    
+
+    private var bottomIcon: some View {
+        Image(systemName: "sun.max.fill")
+            .font(.system(size: 14))
+            .foregroundColor(.orange.opacity(0.9))
+    }
+
     // MARK: - Main Content
-    
+
     private var mainContent: some View {
-        VStack(spacing: 16) {
-            // Large Emoji with pulse effect
+        VStack(spacing: 10) {
             emojiDisplay
-            
-            // Block title
             titleDisplay
-            
-            // Time range
-            timeRangeDisplay
-            
-            // Category tag
+            timeRangeLabel
+
             if let cat = category {
-                categoryTag(cat)
-            }
-            
-            // Completion status
-            if block.isDone {
-                completionBadge
+                tagPill(cat).scaleEffect(0.7)
             }
         }
-        .padding(.horizontal, 24)
     }
-    
-    // MARK: - Emoji Display
-    
+
+    // MARK: - Emoji
+
     private var emojiDisplay: some View {
         Group {
-            if let emoji = block.emoji {
+            if let emoji = displayedBlock.emoji {
                 Text(emoji)
-                    .font(.system(size: 56))
-                    .scaleEffect(pulseAnimation ? 1.05 : 1.0)
-                    .animation(
-                        .easeInOut(duration: 1.5)
-                        .repeatForever(autoreverses: true),
-                        value: pulseAnimation
-                    )
+                    .font(.system(size: 40))   // static, no pulsing
             } else {
                 Image(systemName: "square.dashed")
-                    .font(.system(size: 48))
+                    .font(.system(size: 32))
                     .foregroundColor(themeManager.textTertiaryColor)
             }
         }
     }
-    
-    // MARK: - Title Display
-    
+
+    // MARK: - Title
+
     private var titleDisplay: some View {
-        Text(block.title)
-            .font(.system(size: 18, weight: .semibold, design: .rounded))
+        Text(displayedBlock.title)
+            .font(.system(size: 18,
+                          weight: .semibold,
+                          design: .rounded))
             .foregroundColor(themeManager.textPrimaryColor)
             .multilineTextAlignment(.center)
-            .lineLimit(3)
+            .lineLimit(2)
             .fixedSize(horizontal: false, vertical: true)
     }
-    
-    // MARK: - Time Range Display
-    
-    private var timeRangeDisplay: some View {
-        HStack(spacing: 8) {
-            // Start time
-            timeChip(time: block.startDate, icon: "clock")
-            
-            // Arrow
-            Image(systemName: "arrow.right")
-                .font(.system(size: 12))
-                .foregroundColor(themeManager.textTertiaryColor)
-            
-            // End time
-            timeChip(time: block.endDate, icon: "clock.fill")
-        }
+
+    // MARK: - Time Range (single line, minimal)
+
+    private var timeRangeLabel: some View {
+        Text(timeRangeText)
+            .font(.system(size: 14,
+                          weight: .medium,
+                          design: .rounded))
+            .foregroundColor(themeManager.textSecondaryColor)
     }
-    
-    private func timeChip(time: Date, icon: String) -> some View {
-        HStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(size: 11))
-            
-            Text(time, format: .dateTime.hour().minute())
-                .font(.system(size: 14, weight: .medium, design: .rounded))
-        }
-        .foregroundColor(themeManager.textSecondaryColor)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(themeManager.cardBackgroundColor)
-        .clipShape(RoundedRectangle(cornerRadius: 8))
+
+    private var timeRangeText: String {
+        let f = Self.timeFormatter
+        let start = f.string(from: displayedBlock.startDate)
+        let end   = f.string(from: displayedBlock.endDate)
+        return "\(start) – \(end)"
     }
-    
-    // MARK: - Category Tag
-    
-    private func categoryTag(_ category: Category) -> some View {
+
+    // MARK: - Tag pill (“Focus”, “Creative”, …)
+
+    private func tagPill(_ category: Category) -> some View {
         HStack(spacing: 6) {
-            // Color indicator
             Circle()
                 .fill(categoryColor)
-                .frame(width: 8, height: 8)
-            
-            // Category name
-            Text(category.name)
-                .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundColor(themeManager.textPrimaryColor)
-            
-            // Duration
-            Text("·")
-                .foregroundColor(themeManager.textTertiaryColor)
-            
-            Text("\(block.durationMinutes)m")
-                .font(.system(size: 13, weight: .medium, design: .rounded))
-                .foregroundColor(themeManager.textSecondaryColor)
+                .frame(width: 6, height: 6)
+
+            Text(category.name)        // short tag like “Focus”
+                .font(.system(size: 14,
+                              weight: .medium,
+                              design: .rounded))
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(categoryColor.opacity(0.15))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .strokeBorder(categoryColor.opacity(0.3), lineWidth: 1)
-        )
-    }
-    
-    // MARK: - Completion Badge
-    
-    private var completionBadge: some View {
-        HStack(spacing: 6) {
-            Image(systemName: "checkmark.circle.fill")
-                .font(.system(size: 14))
-            
-            Text("Completed")
-                .font(.system(size: 13, weight: .medium, design: .rounded))
-        }
-        .foregroundColor(.green)
-        .padding(.horizontal, 12)
+        .foregroundColor(themeManager.textPrimaryColor)
+        .padding(.horizontal, 14)
         .padding(.vertical, 6)
         .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(Color.green.opacity(0.15))
+            Capsule()
+                .fill(themeManager.cardBackgroundColor.opacity(0.95))
         )
+        .overlay(
+            Capsule()
+                .stroke(categoryColor.opacity(0.35), lineWidth: 1)
+        )
+        .shadow(color: Color.black.opacity(0.18), radius: 4, x: 0, y: 2)
     }
-    
-    // MARK: - Computed Properties
-    
+
+    // MARK: - Category / Helpers
+
     private var categoryColor: Color {
         guard let category = category else {
             return themeManager.accent
         }
-        
+
         switch category.colorID {
-        case "blue": return Color(red: 0.4, green: 0.6, blue: 1.0)
+        case "blue":   return Color(red: 0.4, green: 0.6, blue: 1.0)
         case "purple": return Color(red: 0.7, green: 0.5, blue: 1.0)
-        case "pink": return Color(red: 1.0, green: 0.5, blue: 0.7)
+        case "pink":   return Color(red: 1.0, green: 0.5, blue: 0.7)
         case "orange": return Color(red: 1.0, green: 0.6, blue: 0.4)
-        case "green": return Color(red: 0.5, green: 0.9, blue: 0.6)
-        case "teal": return Color(red: 0.4, green: 0.8, blue: 0.9)
-        default: return themeManager.accent
+        case "green":  return Color(red: 0.5, green: 0.9, blue: 0.6)
+        case "teal":   return Color(red: 0.4, green: 0.8, blue: 0.9)
+        default:       return themeManager.accent
         }
     }
-    
-    // MARK: - Helpers
-    
+
     private func loadCategory() {
-        guard let categoryID = block.categoryID else {
+        guard let categoryID = displayedBlock.categoryID else {
             category = nil
             return
         }
-        
+
         category = storeContainer.categoryStore.fetchAll()
             .first { $0.id == categoryID }
     }
-    
+
     private func startPulseAnimation() {
         pulseAnimation = true
     }
@@ -254,23 +205,26 @@ struct InnerPlaceFocused: View {
 
 #Preview {
     let container = ModelContainer.createPreview()
-    let storeContainer = StoreContainer(modelContext: container.mainContext, shouldSeed: true)
+    let storeContainer = StoreContainer(
+        modelContext: container.mainContext,
+        shouldSeed: true
+    )
     let viewModel = RadialViewModel(date: Date(), storeContainer: storeContainer)
-    
+
     let block = TimeBlock(
         title: "Deep Work Session",
-        emoji: "🎯",
+        emoji: "💻",
         startDate: Date(),
         endDate: Date().addingTimeInterval(7200),
         categoryID: nil
     )
-    
+
     return ZStack {
         Color.black
         InnerPlaceFocused(
             block: block,
             viewModel: viewModel,
-            innerRadius: 110
+            innerRadius: 96
         )
         .environmentObject(ThemeManager())
         .environmentObject(storeContainer)

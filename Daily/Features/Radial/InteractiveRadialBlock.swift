@@ -271,7 +271,7 @@ struct InteractiveRadialBlock: View {
         let angle = RadialGeometry.pointToAngle(drag.location, center: center)
         current   = movedPreview(current, toAngle: angle)
         previewBlock = current
-
+        viewModel.updateLiveEditingPreview(current)
         triggerSnapHaptic(for: angle)
     }
 
@@ -339,6 +339,7 @@ struct InteractiveRadialBlock: View {
         }
 
         previewBlock = current
+        viewModel.updateLiveEditingPreview(current)
         triggerSnapHaptic(for: angle)
     }
 
@@ -350,24 +351,23 @@ struct InteractiveRadialBlock: View {
 
     private func commitPreviewBlockAndReset() {
         defer {
-            // Reset visuals with animation
             withAnimation(.easeOut(duration: 0.3)) {
                 dragSwellProgress = 0
                 dragArmed         = false
             }
-            // Reset logic
-            dragMode         = .none
-            lastSnapAngle    = nil
-            previewBlock     = nil
-            dragAngleOffset  = 0
+            dragMode        = .none
+            lastSnapAngle   = nil
+            previewBlock    = nil
+            dragAngleOffset = 0
+            viewModel.clearLiveEditingPreview(for: block.id)   // NEW
             viewModel.setInteractionMode(.idle)
         }
 
         guard let finalBlock = previewBlock else { return }
-
         viewModel.commitBlock(finalBlock)
         HapticManager.shared.trigger(.blockEdit)
     }
+
 
     // MARK: - Block half classification
 

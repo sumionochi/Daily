@@ -19,7 +19,10 @@ class RadialViewModel: ObservableObject {
     
     // Editing
     @Published var editingBlockID: UUID? = nil
-    
+    // In RadialViewModel
+
+    @Published var liveEditingBlock: TimeBlock?
+
     // MARK: - Dependencies
     
     let storeContainer: StoreContainer
@@ -224,6 +227,17 @@ class RadialViewModel: ObservableObject {
         }
         
         blocks[index] = block
+    }
+    
+    func updateLiveEditingPreview(_ block: TimeBlock) {
+        // Called while dragging/resizing
+        liveEditingBlock = block
+    }
+
+    func clearLiveEditingPreview(for blockID: UUID) {
+        if liveEditingBlock?.id == blockID {
+            liveEditingBlock = nil
+        }
     }
     
     func saveBlockChanges(_ blockID: UUID) {
