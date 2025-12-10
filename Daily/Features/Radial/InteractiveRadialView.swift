@@ -96,8 +96,6 @@ struct InteractiveRadialView: View {
     }
 }
 
-// MARK: - Current Time Indicator (Watch-style)
-
 struct CurrentTimeIndicatorView: View {
     @EnvironmentObject var themeManager: ThemeManager
 
@@ -120,7 +118,7 @@ struct CurrentTimeIndicatorView: View {
 
             let angle = RadialGeometry.timeToAngle(currentTime)
 
-            // Needle from inner edge of ring to outer edge
+            // 1. Calculate Needle Points
             let needleStart = RadialGeometry.angleToPoint(
                 angle,
                 radius: innerRadius,
@@ -132,10 +130,16 @@ struct CurrentTimeIndicatorView: View {
                 center: center
             )
 
-            // Time label just inside the ring, slightly offset
-            let capsuleRadialOffset: CGFloat = 6
-
-            let labelRadius = outerRadius + capsuleRadialOffset
+            // 2. Calculate Label Position
+            // The capsule has a font of 10 + vertical padding of 2.
+            // Total height is approx 16-18pt. Half height is ~9pt.
+            // We want a clear gap between the needle tip and the capsule edge.
+            let gap: CGFloat = 10
+            let approxHalfHeight: CGFloat = 9
+            
+            // The center of the label should be at this radius
+            let labelRadius = outerRadius + gap + approxHalfHeight
+            
             let labelPoint = RadialGeometry.angleToPoint(
                 angle,
                 radius: labelRadius,
@@ -157,19 +161,12 @@ struct CurrentTimeIndicatorView: View {
                 )
                 .shadow(color: themeManager.accent.opacity(0.7), radius: 6)
 
-                // Tip dot
-//                Circle()
-//                    .fill(themeManager.accent)
-//                    .frame(width: 10, height: 10)
-//                    .position(needleEnd)
-//                    .shadow(color: themeManager.accent.opacity(0.8), radius: 8)
-
                 // Time capsule
                 Text(Self.timeFormatter.string(from: currentTime))
                     .font(.system(size: 10, weight: .semibold, design: .rounded))
                     .foregroundColor(themeManager.accent)
                     .padding(.horizontal, 6)
-                    .padding(.vertical, 2)
+                    .padding(.vertical, 2) // This determines the height used in our math above
                     .background(
                         Capsule()
                             .fill(themeManager.backgroundColor.opacity(0.92))
@@ -178,8 +175,9 @@ struct CurrentTimeIndicatorView: View {
                         Capsule()
                             .stroke(themeManager.accent.opacity(0.8), lineWidth: 0.6)
                     )
+                    // 3. Position exactly at the calculated radial point
                     .position(labelPoint)
-                    .offset(x: -8, y: -16)
+                    // 4. REMOVED the hardcoded .offset(x: -8, y: -16) here
             }
         }
         .onReceive(timer) { _ in
