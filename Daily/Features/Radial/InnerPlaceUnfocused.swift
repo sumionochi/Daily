@@ -1,3 +1,5 @@
+// Features/Radial/Views/InnerPlaceUnfocused.swift
+
 import SwiftUI
 import SwiftData
 
@@ -6,30 +8,28 @@ struct InnerPlaceUnfocused: View {
     @ObservedObject var viewModel: RadialViewModel
 
     let innerRadius: CGFloat
+    let outerRadius: CGFloat
 
     var body: some View {
         ZStack {
             // Background circle
             Circle()
                 .fill(themeManager.backgroundColor.opacity(0.95))
-                .frame(width: innerRadius * 2,
-                       height: innerRadius * 2)
 
-            VStack(spacing: 8) {
-                // Top icon (small moon)
-                moonIcon
-                    .padding(.top, 8)
+            // Center content
+            centerContent
+                .padding(.horizontal, 16)
 
-                // Middle content (no big Spacers)
-                centerContent
+            // Moon at 00 / 24 (fixed to dial)
+            moonIcon
+                .offset(y: -(outerRadius - 65))
 
-                // Bottom icon (small sun)
-                sunIcon
-                    .padding(.bottom, 8)
-            }
-            .frame(width: innerRadius * 2 * 0.9,
-                   height: innerRadius * 2 * 0.9)
+            // Sun at 12 (fixed to dial)
+            sunIcon
+                .offset(y: (outerRadius - 65))
         }
+        .frame(width: innerRadius * 2,
+               height: innerRadius * 2)
     }
 
     // MARK: - Moon Icon
@@ -51,7 +51,7 @@ struct InnerPlaceUnfocused: View {
     // MARK: - Center Content
 
     private var centerContent: some View {
-        VStack(spacing: 6) {
+        VStack(spacing: 4) {
             dayText
             scheduledTimeText
 
@@ -60,7 +60,8 @@ struct InnerPlaceUnfocused: View {
                 categoryStatsList
             }
         }
-        .padding(.horizontal, 16)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 8)
     }
 
     // MARK: - Day Text
@@ -95,10 +96,9 @@ struct InnerPlaceUnfocused: View {
 
     private var categoryStatsList: some View {
         ScrollView(showsIndicators: false) {
-            VStack(spacing: 4) {
+            VStack(spacing: 3) {
                 if let stats = viewModel.statistics {
-                    // show ALL categories; about 4 visible at once, then scroll
-                    ForEach(stats.categoryBreakdown, id: \.category.id) { item in
+                    ForEach(stats.categoryBreakdown.prefix(4), id: \.category.id) { item in
                         CategoryStatRow(
                             category: item.category,
                             duration: item.duration
@@ -106,12 +106,12 @@ struct InnerPlaceUnfocused: View {
                     }
                 }
             }
+            .padding(.horizontal, 4)
         }
-        // ~4 rows tall, but still scrollable if there are more
-        .frame(maxHeight: 120)
+        .frame(maxHeight: 70)
     }
 
-    // MARK: - Computed Properties (unchanged)
+    // MARK: - Computed Properties
 
     private var dayLabel: String {
         let calendar = Calendar.current
@@ -142,7 +142,6 @@ struct InnerPlaceUnfocused: View {
         }
     }
 }
-
 
 // MARK: - Category Stat Row
 
@@ -203,4 +202,18 @@ struct CategoryStatRow: View {
     }
 }
 
+#Preview {
+    let container = ModelContainer.createPreview()
+    let storeContainer = StoreContainer(
+        modelContext: container.mainContext,
+        shouldSeed: true
+    )
+    let viewModel = RadialViewModel(date: Date(), storeContainer: storeContainer)
 
+    return ZStack {
+        Color.black
+        InnerPlaceUnfocused(viewModel: viewModel, innerRadius: 96, outerRadius: 180)
+            .environmentObject(ThemeManager())
+            .environmentObject(storeContainer)
+    }
+}

@@ -153,7 +153,6 @@ class RadialViewModel: ObservableObject {
         
         var block = blocks[index]
         
-        // Duration in 24h-wrapped sense (so 22:00 → 02:00 is 4h, not negative).
         let originalDuration = normalizedDuration(from: block.startDate, to: block.endDate)
         
         let newStartTime = angleToTime(angle, for: currentDate)
@@ -162,7 +161,8 @@ class RadialViewModel: ObservableObject {
         block.startDate = snappedStart
         block.endDate = snappedStart.addingTimeInterval(originalDuration)
         
-        blocks[index] = block
+        // ✅ Use preview, don't republish array
+        liveEditingBlock = block
     }
     
     /// Resize by dragging either start or end handle. Handles wrap through 00 gracefully.
@@ -187,17 +187,12 @@ class RadialViewModel: ObservableObject {
         
         // Resize end
         if let endAngle = newEndAngle {
-            // Time-of-day for the handle position
             let endTOD = angleToTime(endAngle, for: currentDate)
             let snappedTOD = snapToInterval(endTOD)
             
-            // Candidate 1: same day as currentDate
             let sameDayEnd = snappedTOD
-            
-            // Candidate 2: next day (for crossing midnight)
             let nextDayEnd = calendar.date(byAdding: .day, value: 1, to: sameDayEnd)!
             
-            // Pick whichever is closer to the *current* endDate
             let diffSame = abs(sameDayEnd.timeIntervalSince(block.endDate))
             let diffNext = abs(nextDayEnd.timeIntervalSince(block.endDate))
             
@@ -206,27 +201,25 @@ class RadialViewModel: ObservableObject {
             changedEnd = true
         }
         
-        // Enforce minimum duration in wrapped 24h sense
+        // Enforce minimum duration
         let minDuration = timeSnapInterval.seconds
         var duration = normalizedDuration(from: block.startDate, to: block.endDate)
         
         if duration < minDuration {
             if changedStart && !changedEnd {
-                // We moved the start; clamp start so that end stays fixed.
                 block.startDate = block.endDate.addingTimeInterval(-minDuration)
             } else {
-                // Default: clamp end relative to start.
                 block.endDate = block.startDate.addingTimeInterval(minDuration)
             }
             duration = minDuration
         }
         
-        // Optional: clamp to max 24h to avoid weird over-long blocks
         if duration > secondsInDay {
             block.endDate = block.startDate.addingTimeInterval(secondsInDay)
         }
         
-        blocks[index] = block
+        // ✅ Use preview, don't republish array
+        liveEditingBlock = block
     }
     
     func updateLiveEditingPreview(_ block: TimeBlock) {
@@ -241,11 +234,27 @@ class RadialViewModel: ObservableObject {
     }
     
     func saveBlockChanges(_ blockID: UUID) {
-        guard let block = blocks.first(where: { $0.id == blockID }) else {
+        // Use liveEditingBlock if available, otherwise use blocks array
+        let blockToSave: TimeBlock
+        
+        if let live = liveEditingBlock, live.id == blockID {
+            blockToSave = live
+        } else if let block = blocks.first(where: { $0.id == blockID }) {
+            blockToSave = block
+        } else {
             return
         }
         
-        _ = storeContainer.planStore.updateBlock(block)
+        // Update blocks array (only once, on save)
+        if let index = blocks.firstIndex(where: { $0.id == blockID }) {
+            blocks[index] = blockToSave
+        }
+        
+        // Clear live preview
+        liveEditingBlock = nil
+        
+        // Persist
+        _ = storeContainer.planStore.updateBlock(blockToSave)
         NotificationCenter.default.post(name: NSNotification.Name("BlocksUpdated"), object: nil)
     }
     

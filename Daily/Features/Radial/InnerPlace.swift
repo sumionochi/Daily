@@ -1,7 +1,5 @@
 // Features/Radial/Views/InnerPlace.swift
 
-// Features/Radial/Views/InnerPlace.swift
-
 import SwiftUI
 import SwiftData
 
@@ -10,7 +8,7 @@ struct InnerPlace: View {
     @ObservedObject var viewModel: RadialViewModel
     
     let innerRadius: CGFloat
-    
+    let outerRadius: CGFloat
     var body: some View {
         ZStack {
             // State-aware content
@@ -19,7 +17,8 @@ struct InnerPlace: View {
                 case .unfocused:
                     InnerPlaceUnfocused(
                         viewModel: viewModel,
-                        innerRadius: innerRadius
+                        innerRadius: innerRadius,
+                        outerRadius: outerRadius
                     )
                     .transition(.asymmetric(
                         insertion: .scale(scale: 0.9).combined(with: .opacity),
@@ -31,7 +30,8 @@ struct InnerPlace: View {
                         InnerPlaceFocused(
                             block: block,
                             viewModel: viewModel,
-                            innerRadius: innerRadius
+                            innerRadius: innerRadius,
+                            outerRadius: outerRadius
                         )
                         .transition(.asymmetric(
                             insertion: .scale(scale: 1.1).combined(with: .opacity),
@@ -63,7 +63,7 @@ struct InnerPlace: View {
     
     return ZStack {
         Color.black
-        InnerPlace(viewModel: viewModel, innerRadius: 110)
+        InnerPlace(viewModel: viewModel, innerRadius: 110, outerRadius: 180)
             .environmentObject(ThemeManager())
     }
 }

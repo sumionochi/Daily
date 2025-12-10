@@ -125,21 +125,19 @@ struct InteractiveRadialBlock: View {
                 )
                 .scaleEffect(blockScale)
                 .shadow(
-                    color: dragArmed
-                        ? themeManager.accent.opacity(0.6)
-                        : (isFocused ? themeManager.accent.opacity(0.3) : .clear),
-                    radius: dragArmed ? 15 : (isFocused ? 8 : 0)
+                    color: (dragMode != .none) ? .clear : (isFocused ? themeManager.accent.opacity(0.3) : .clear),
+                    radius: (dragMode != .none) ? 0 : (isFocused ? 8 : 0)
                 )
 
-                // --- Layer 2: Energy Flow Overlay (Only when Armed) ---
-                if dragArmed {
+                // --- Layer 2: Energy Flow Overlay (Only when Armed & NOT Dragging) ---
+                if dragArmed && dragMode == .none {
                     EnergyFlowArcOverlay(
                         startAngle: activeBlock.startAngle,
                         endAngle: activeBlock.endAngle,
                         innerRadius: arcInner,
                         outerRadius: arcOuter,
                         color: themeManager.accent,
-                        isActive: dragArmed
+                        isActive: true
                     )
                     .scaleEffect(blockScale)
                     .allowsHitTesting(false)
@@ -163,6 +161,7 @@ struct InteractiveRadialBlock: View {
                 .allowsHitTesting(false)
             }
             // 🔑 Hit area = this block’s arc only
+            .drawingGroup()
             .contentShape(
                 ArcHitShape(
                     startAngle: activeBlock.startAngle,
@@ -207,14 +206,13 @@ struct InteractiveRadialBlock: View {
             // 🔁 Animation Logic for Swell
             .onChange(of: isPressingForDrag) { _, isPressing in
                 if isPressing && isFocused {
-                    // Start Swell with a slight delay so quick resize drags don't trigger it
+                    // Start Swell with a slight delay
                     withAnimation(.easeInOut(duration: 0.85).delay(0.15)) {
                         dragSwellProgress = 1.0
                     }
                 } else {
-                    // User let go or gesture failed/ended
-                    if !dragArmed {
-                        // Deflate quickly if we never reached armed state
+                    // User let go - only animate if not actively dragging
+                    if dragMode == .none {
                         withAnimation(.easeOut(duration: 0.2)) {
                             dragSwellProgress = 0
                         }
@@ -637,7 +635,7 @@ struct EnergyFlowArcOverlay: View {
 
     private func startEnergyAnimation() {
         phase = 0.0
-        withAnimation(.linear(duration: 1.8).repeatForever(autoreverses: false)) {
+        withAnimation(.linear(duration: 2.5).repeatForever(autoreverses: false)) {
             phase = 1.0
         }
     }

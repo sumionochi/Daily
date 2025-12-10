@@ -48,7 +48,8 @@ struct InteractiveRadialViewiPad: View {
             // Inner place (state-aware)
             InnerPlace(
                 viewModel: viewModel,
-                innerRadius: innerRadius
+                innerRadius: innerRadius,
+                outerRadius: outerRadius
             )
 
             // Current time indicator (only for today)

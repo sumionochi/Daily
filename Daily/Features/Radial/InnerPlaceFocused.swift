@@ -10,9 +10,9 @@ struct InnerPlaceFocused: View {
     let block: TimeBlock          // original block (for id)
     @ObservedObject var viewModel: RadialViewModel
     let innerRadius: CGFloat
-
+    let outerRadius: CGFloat
     @State private var category: Category?
-    @State private var pulseAnimation = false
+    @State private var pulseAnimation = false   // kept in case you want to re-enable later
 
     // Small static formatter for compact time range
     private static let timeFormatter: DateFormatter = {
@@ -38,29 +38,21 @@ struct InnerPlaceFocused: View {
             // Minimal flat circle
             Circle()
                 .fill(themeManager.backgroundColor.opacity(0.96))
-                .frame(width: innerRadius * 2,
-                       height: innerRadius * 2)
 
-            VStack(spacing: 0) {
-                // Small top moon
-                topIcon
-                    .padding(.top, 10)
+            // Center content (emoji, title, time, tag)
+            mainContent
+                .padding(.horizontal, 20)
 
-                Spacer(minLength: 8)
+            // Moon at 00 / 24 (top, fixed to dial)
+            topIcon
+                .offset(y: -(outerRadius - 65))
 
-                // Main content (emoji, title, time, tag)
-                mainContent
-                    .padding(.horizontal, 20)
-
-                Spacer(minLength: 8)
-
-                // Small bottom sun
-                bottomIcon
-                    .padding(.bottom, 10)
-            }
-            .frame(width: innerRadius * 2 * 0.9,
-                   height: innerRadius * 2 * 0.9)
+            // Sun at 12 (bottom, fixed to dial)
+            bottomIcon
+                .offset(y: (outerRadius - 65))
         }
+        .frame(width: innerRadius * 2,
+               height: innerRadius * 2)
         .onAppear {
             loadCategory()
             startPulseAnimation()
@@ -93,7 +85,8 @@ struct InnerPlaceFocused: View {
             timeRangeLabel
 
             if let cat = category {
-                tagPill(cat).scaleEffect(0.7)
+                tagPill(cat)
+                    .scaleEffect(0.7)
             }
         }
     }
@@ -104,7 +97,7 @@ struct InnerPlaceFocused: View {
         Group {
             if let emoji = displayedBlock.emoji {
                 Text(emoji)
-                    .font(.system(size: 40))   // static, no pulsing
+                    .font(.system(size: 40))   // static, no pulsing / up-down
             } else {
                 Image(systemName: "square.dashed")
                     .font(.system(size: 32))
@@ -199,6 +192,8 @@ struct InnerPlaceFocused: View {
     }
 
     private func startPulseAnimation() {
+        // currently just flips the flag; you can remove it
+        // or re-use it later for subtle effects
         pulseAnimation = true
     }
 }
@@ -224,7 +219,8 @@ struct InnerPlaceFocused: View {
         InnerPlaceFocused(
             block: block,
             viewModel: viewModel,
-            innerRadius: 96
+            innerRadius: 96,
+            outerRadius: 180
         )
         .environmentObject(ThemeManager())
         .environmentObject(storeContainer)

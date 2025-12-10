@@ -223,7 +223,7 @@ struct TodayView: View {
     }
     
     private func createBlock(_ block: TimeBlock) {
-        if let created = storeContainer.planStore.createBlock(block) {
+        if storeContainer.planStore.createBlock(block) != nil {
             let impact = UIImpactFeedbackGenerator(style: .medium)
             impact.impactOccurred()
         }
@@ -251,7 +251,7 @@ struct TodayView: View {
             sourceType: .manual
         )
         
-        if let created = storeContainer.planStore.createBlock(block) {
+        if storeContainer.planStore.createBlock(block) != nil {
             loadUnscheduledTasks()
             
             let impact = UIImpactFeedbackGenerator(style: .medium)

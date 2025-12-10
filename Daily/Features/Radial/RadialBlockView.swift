@@ -35,7 +35,7 @@ struct RadialBlockView: View {
                         endPoint: .bottom
                     )
                 )
-                .shadow(color: categoryColor.opacity(0.30), radius: 6)
+//                .shadow(color: categoryColor.opacity(0.30), radius: 6)
             
             // Soft border (slight inner highlight + color edge)
             bubbleArc
@@ -153,10 +153,6 @@ struct RadialBlockView: View {
     }
 }
 
-// MARK: - Bubbly arc shape with rounded caps
-
-/// Draws a single circular arc as a thick stroke with rounded caps,
-/// giving a "pill" / bubbly look around the ring.
 struct BubblyArcShape: Shape {
     /// Angles are in the radial system (0° = top, clockwise).
     let startAngle: Double
